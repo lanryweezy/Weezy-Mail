@@ -1,0 +1,6 @@
+{
+  "name": "Agentic AI Mailbox",
+  "description": "An intelligent mailbox application that uses a chat assistant to manage and perform email tasks through natural language commands.",
+  "requestFramePermissions": [],
+  "prompt": ""
+}

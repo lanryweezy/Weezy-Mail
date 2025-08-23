@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Agentic AI Mailbox</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+      /* Common variables */
+      :root {
+        --accent-primary: #2563eb;
+        --accent-cyan: #00f2ff;
+      }
+
+      /* Dark Theme (Default) */
+      [data-theme="dark"] {
+        --bg-dark: #0a0a14;
+        --bg-panel: rgba(22, 25, 42, 0.4);
+        --bg-panel-solid: rgb(22, 25, 42);
+        --border-glow: rgba(0, 242, 255, 0.15);
+        --text-primary: #e0e4fa;
+        --text-secondary: #a8b2d1;
+        --text-tertiary: #6e7e9e;
+      }
+      
+      /* Light Theme */
+      [data-theme="light"] {
+        --bg-dark: #f0f2f5;
+        --bg-panel: rgba(255, 255, 255, 0.8);
+        --bg-panel-solid: rgb(255, 255, 255);
+        --border-glow: rgba(0, 0, 0, 0.1);
+        --text-primary: #1f2937;
+        --text-secondary: #4b5563;
+        --text-tertiary: #6b7280;
+      }
+
+      body {
+         background-color: var(--bg-dark);
+         transition: background-color 0.3s ease;
+      }
+      
+      [data-theme="dark"] body {
+        background-image: radial-gradient(circle at 1px 1px, rgba(129, 237, 255, 0.1) 1px, transparent 0); 
+        background-size: 2rem 2rem;
+      }
+
+      [data-theme="light"] body {
+         background-image: radial-gradient(circle at 1px 1px, rgba(0, 0, 0, 0.05) 1px, transparent 0);
+         background-size: 2rem 2rem;
+      }
+
+      @keyframes pulse-glow {
+        0%, 100% { box-shadow: 0 0 4px 0px var(--accent-cyan); }
+        50% { box-shadow: 0 0 10px 2px var(--accent-cyan); }
+      }
+      @keyframes slow-fade-in {
+        from { opacity: 0; transform: translateY(10px); }
+        to { opacity: 1; transform: translateY(0); }
+      }
+      .animate-slow-fade-in {
+        animation: slow-fade-in 0.6s ease-out forwards;
+      }
+      .futuristic-scrollbar::-webkit-scrollbar {
+        width: 6px;
+      }
+      .futuristic-scrollbar::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      .futuristic-scrollbar::-webkit-scrollbar-thumb {
+        background-color: var(--accent-primary);
+        border-radius: 6px;
+        border: 2px solid transparent;
+        background-clip: content-box;
+      }
+       .futuristic-scrollbar:hover::-webkit-scrollbar-thumb {
+        background-color: var(--accent-cyan);
+      }
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "react-dom/": "https://esm.sh/react-dom@^19.1.1/",
+    "@google/genai": "https://esm.sh/@google/genai@^1.13.0",
+    "react/": "https://esm.sh/react@^19.1.1/",
+    "react": "https://esm.sh/react@^19.1.1"
+  }
+}
+</script>
+</head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>

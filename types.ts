@@ -54,6 +54,16 @@ export enum AIAction {
     OPEN_COMPOSE_MODAL = 'OPEN_COMPOSE_MODAL',
     CHANGE_VIEW = 'CHANGE_VIEW',
     NO_ACTION = 'NO_ACTION',
+    // New agentic actions
+    UNSUBSCRIBE_BULK = 'UNSUBSCRIBE_BULK',
+    CONVERT_ATTACHMENT = 'CONVERT_ATTACHMENT',
+    EXTRACT_INVOICE_DATA = 'EXTRACT_INVOICE_DATA',
+    SCHEDULE_FOLLOWUP = 'SCHEDULE_FOLLOWUP',
+    CLEAN_INBOX = 'CLEAN_INBOX',
+    GENERATE_SUMMARY_DIGEST = 'GENERATE_SUMMARY_DIGEST',
+    AUTO_CATEGORIZE = 'AUTO_CATEGORIZE',
+    DETECT_ACTION_ITEMS = 'DETECT_ACTION_ITEMS',
+    SMART_PRIORITIZE = 'SMART_PRIORITIZE',
 }
 
 export interface AIActionParameter {
@@ -109,4 +119,75 @@ export interface AgentConfig {
 export interface Account {
     email: string;
     provider: string;
+}
+
+// New types for enhanced agentic features
+export interface Subscription {
+    id: string;
+    name: string;
+    email: string;
+    readCount: number;
+    totalCount: number;
+    lastActivity: string;
+    category: 'newsletter' | 'promotional' | 'updates' | 'social';
+    isActive: boolean;
+    source: string; // e.g., "TechCrunch", "Medium Digest"
+}
+
+export interface SmartAttachment {
+    id: string;
+    name: string;
+    type: 'PDF' | 'DOCX' | 'XLSX' | 'IMG' | 'OTHER';
+    size: number;
+    emailId: number;
+    extractedText?: string;
+    suggestedActions: AttachmentAction[];
+    conversionOptions: string[];
+}
+
+export type AttachmentAction = 
+    | 'convert_to_excel' 
+    | 'summarize_and_send' 
+    | 'extract_text' 
+    | 'categorize'
+    | 'create_task'
+    | 'schedule_followup';
+
+export interface QuickAction {
+    id: string;
+    label: string;
+    icon: string;
+    description: string;
+    action: () => void;
+    category: 'drafting' | 'scheduling' | 'extraction' | 'organization' | 'automation';
+}
+
+export interface InboxSummary {
+    urgentCount: number;
+    actionItemsCount: number;
+    unreadNewsletters: number;
+    filesForConversion: number;
+    overdueReplies: number;
+    scheduledEmails: number;
+}
+
+export interface ConversationThread {
+    id: string;
+    subject: string;
+    participants: string[];
+    emailIds: number[];
+    lastActivity: string;
+    status: 'active' | 'resolved' | 'waiting' | 'escalated';
+    aiSummary?: string;
+    actionItems: string[];
+}
+
+export interface AgenticInsight {
+    type: 'subscription_cleanup' | 'reply_suggestion' | 'file_conversion' | 'schedule_conflict' | 'follow_up_needed';
+    priority: 'low' | 'medium' | 'high';
+    title: string;
+    description: string;
+    actionable: boolean;
+    suggestedAction?: string;
+    relatedEmailIds?: number[];
 }

@@ -1,5 +1,5 @@
 
-import { Email, EmailStatus, EmailCategory } from './types';
+import { Email, EmailStatus, EmailCategory, Subscription, SmartAttachment, QuickAction, AgenticInsight, InboxSummary } from './types';
 
 export const MOCK_EMAILS: Email[] = [
   {
@@ -130,4 +130,198 @@ export const createNewMockEmail = (): Email => {
         status: EmailStatus.UNREAD,
         category: senders[randomIdx].category,
     };
+};
+
+// Mock data for new agentic features
+export const MOCK_SUBSCRIPTIONS: Subscription[] = [
+    {
+        id: 'techcrunch',
+        name: 'TechCrunch',
+        email: 'techcrunch@techcrunch.com',
+        readCount: 2,
+        totalCount: 30,
+        lastActivity: '2024-07-20T10:00:00Z',
+        category: 'newsletter',
+        isActive: true,
+        source: 'TechCrunch'
+    },
+    {
+        id: 'medium',
+        name: 'Medium Digest',
+        email: 'digest@medium.com',
+        readCount: 0,
+        totalCount: 20,
+        lastActivity: '2024-07-15T08:00:00Z',
+        category: 'newsletter',
+        isActive: true,
+        source: 'Medium Digest'
+    },
+    {
+        id: 'aws',
+        name: 'AWS Newsletter',
+        email: 'newsletter@aws.amazon.com',
+        readCount: 12,
+        totalCount: 15,
+        lastActivity: '2024-07-25T14:00:00Z',
+        category: 'updates',
+        isActive: true,
+        source: 'AWS Updates'
+    },
+    {
+        id: 'vercel',
+        name: 'Vercel Updates',
+        email: 'updates@vercel.com',
+        readCount: 8,
+        totalCount: 10,
+        lastActivity: '2024-07-28T16:00:00Z',
+        category: 'updates',
+        isActive: true,
+        source: 'Vercel'
+    }
+];
+
+export const MOCK_SMART_ATTACHMENTS: SmartAttachment[] = [
+    {
+        id: 'salary-breakdown',
+        name: 'Salary_Breakdown_Q3.pdf',
+        type: 'PDF',
+        size: 245760,
+        emailId: 10,
+        extractedText: 'Salary breakdown for Q3 2024...',
+        suggestedActions: ['convert_to_excel', 'extract_text'],
+        conversionOptions: ['xlsx', 'csv', 'docx']
+    },
+    {
+        id: 'proposal-draft',
+        name: 'Project_Proposal_Draft.docx',
+        type: 'DOCX',
+        size: 156800,
+        emailId: 11,
+        suggestedActions: ['summarize_and_send', 'create_task'],
+        conversionOptions: ['pdf', 'txt']
+    },
+    {
+        id: 'receipt-image',
+        name: 'Receipt_20240729.jpg',
+        type: 'IMG',
+        size: 98304,
+        emailId: 12,
+        suggestedActions: ['extract_text', 'categorize'],
+        conversionOptions: ['pdf']
+    }
+];
+
+export const MOCK_QUICK_ACTIONS: QuickAction[] = [
+    {
+        id: 'draft-reply',
+        label: 'Draft & Send Smart Reply',
+        icon: '📤',
+        description: 'AI-powered reply generation',
+        action: () => console.log('Draft smart reply'),
+        category: 'drafting'
+    },
+    {
+        id: 'schedule-followup',
+        label: 'Schedule Follow-Up',
+        icon: '📅',
+        description: 'Set intelligent reminders',
+        action: () => console.log('Schedule follow-up'),
+        category: 'scheduling'
+    },
+    {
+        id: 'extract-invoice',
+        label: 'Extract Invoice Data',
+        icon: '🧾',
+        description: 'Parse invoice information',
+        action: () => console.log('Extract invoice data'),
+        category: 'extraction'
+    },
+    {
+        id: 'pin-threads',
+        label: 'Pin Important Threads',
+        icon: '📌',
+        description: 'Organize priority conversations',
+        action: () => console.log('Pin threads'),
+        category: 'organization'
+    },
+    {
+        id: 'clean-inbox',
+        label: 'Clean Inbox (AI Sweep)',
+        icon: '🧹',
+        description: 'Automated inbox organization',
+        action: () => console.log('Clean inbox'),
+        category: 'automation'
+    },
+    {
+        id: 'voice-compose',
+        label: 'Voice-to-Email',
+        icon: '🎤',
+        description: 'Dictate emails hands-free',
+        action: () => console.log('Voice compose'),
+        category: 'drafting'
+    },
+    {
+        id: 'smart-categorize',
+        label: 'Auto-Categorize All',
+        icon: '🏷️',
+        description: 'Bulk AI categorization',
+        action: () => console.log('Auto categorize'),
+        category: 'automation'
+    },
+    {
+        id: 'sentiment-analysis',
+        label: 'Analyze Email Tone',
+        icon: '😊',
+        description: 'Check emotional sentiment',
+        action: () => console.log('Analyze sentiment'),
+        category: 'extraction'
+    }
+];
+
+export const MOCK_AGENTIC_INSIGHTS: AgenticInsight[] = [
+    {
+        type: 'subscription_cleanup',
+        priority: 'medium',
+        title: 'Subscription Cleanup',
+        description: '3 newsletters with <10% engagement rate detected',
+        actionable: true,
+        suggestedAction: 'Auto-unsubscribe',
+        relatedEmailIds: [5, 6, 7]
+    },
+    {
+        type: 'reply_suggestion',
+        priority: 'high',
+        title: 'Pending Reply',
+        description: 'Elon Musk email from 2 days ago needs response',
+        actionable: true,
+        suggestedAction: 'Draft Reply',
+        relatedEmailIds: [3]
+    },
+    {
+        type: 'file_conversion',
+        priority: 'low',
+        title: 'File Format Optimization',
+        description: '2 PDFs can be converted to preferred Excel format',
+        actionable: true,
+        suggestedAction: 'Convert Files',
+        relatedEmailIds: [10, 12]
+    },
+    {
+        type: 'follow_up_needed',
+        priority: 'medium',
+        title: 'Follow-up Reminder',
+        description: 'Project proposal sent 1 week ago - no response',
+        actionable: true,
+        suggestedAction: 'Send Follow-up',
+        relatedEmailIds: [8]
+    }
+];
+
+export const MOCK_INBOX_SUMMARY: InboxSummary = {
+    urgentCount: 3,
+    actionItemsCount: 7,
+    unreadNewsletters: 12,
+    filesForConversion: 2,
+    overdueReplies: 4,
+    scheduledEmails: 1
 };

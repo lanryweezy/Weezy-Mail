@@ -1,13 +1,17 @@
 
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
-import { Email, EmailStatus, AIAction, ChatMessage, MessageAuthor, MailboxView, EmailCategory, AISearchCriteria, Theme, Account, AgentConfig } from './types';
-import { MOCK_EMAILS, createNewMockEmail } from './constants';
+import { Email, EmailStatus, AIAction, ChatMessage, MessageAuthor, MailboxView, EmailCategory, AISearchCriteria, Theme, Account, AgentConfig, Subscription, SmartAttachment, QuickAction, AgenticInsight, InboxSummary } from './types';
+import { MOCK_EMAILS, createNewMockEmail, MOCK_SUBSCRIPTIONS, MOCK_SMART_ATTACHMENTS, MOCK_QUICK_ACTIONS, MOCK_AGENTIC_INSIGHTS, MOCK_INBOX_SUMMARY } from './constants';
 import MailboxPanel from './components/MailboxPanel';
 import EmailDetail from './components/EmailDetail';
 import ChatAssistant from './components/ChatAssistant';
 import ComposeModal from './components/ComposeModal';
 import SettingsModal from './components/SettingsModal';
 import Resizer from './components/Resizer';
+import InboxSummaryDashboard from './components/InboxSummaryDashboard';
+import SubscriptionManager from './components/SubscriptionManager';
+import SmartFileAssistant from './components/SmartFileAssistant';
+import AgenticActionsSidebar from './components/AgenticActionsSidebar';
 import { processEmailCommand, generateQuickReplies, processSearchQuery } from './services/geminiService';
 
 const App: React.FC = () => {
@@ -39,6 +43,14 @@ const App: React.FC = () => {
       enableQuickReplies: true,
       enableSummarization: true
   });
+
+  // --- Agentic Features State ---
+  const [subscriptions, setSubscriptions] = useState<Subscription[]>(MOCK_SUBSCRIPTIONS);
+  const [smartAttachments, setSmartAttachments] = useState<SmartAttachment[]>(MOCK_SMART_ATTACHMENTS);
+  const [quickActions, setQuickActions] = useState<QuickAction[]>(MOCK_QUICK_ACTIONS);
+  const [agenticInsights, setAgenticInsights] = useState<AgenticInsight[]>(MOCK_AGENTIC_INSIGHTS);
+  const [inboxSummary, setInboxSummary] = useState<InboxSummary>(MOCK_INBOX_SUMMARY);
+  const [currentDashboardView, setCurrentDashboardView] = useState<'dashboard' | 'emails'>('dashboard');
   
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
@@ -487,6 +499,82 @@ const App: React.FC = () => {
     }
   };
 
+  // --- Agentic Feature Handlers ---
+  const handleUnsubscribe = (subscriptionIds: string[]) => {
+    setSubscriptions(prev => prev.filter(sub => !subscriptionIds.includes(sub.id)));
+    setToastMessage(`Unsubscribed from ${subscriptionIds.length} newsletter(s)`);
+    setTimeout(() => setToastMessage(null), 3000);
+  };
+
+  const handleToggleDigestMode = (subscriptionId: string) => {
+    setSubscriptions(prev => prev.map(sub => 
+      sub.id === subscriptionId ? { ...sub, isActive: !sub.isActive } : sub
+    ));
+  };
+
+  const handleConvertFile = (attachmentId: string, format: string) => {
+    console.log(`Converting ${attachmentId} to ${format}`);
+    setToastMessage(`Converting file to ${format.toUpperCase()}`);
+    setTimeout(() => setToastMessage(null), 3000);
+  };
+
+  const handleExtractText = (attachmentId: string) => {
+    const attachment = smartAttachments.find(a => a.id === attachmentId);
+    if (attachment) {
+      console.log(`Extracting text from ${attachment.name}`);
+      setToastMessage(`Extracting text from ${attachment.name}`);
+      setTimeout(() => setToastMessage(null), 3000);
+    }
+  };
+
+  const handleSummarizeAndSend = (attachmentId: string, recipient: string) => {
+    const attachment = smartAttachments.find(a => a.id === attachmentId);
+    if (attachment) {
+      console.log(`Summarizing ${attachment.name} and sending to ${recipient}`);
+      setToastMessage(`Summarizing and sending ${attachment.name}`);
+      setTimeout(() => setToastMessage(null), 3000);
+    }
+  };
+
+  const handleCreateTask = (attachmentId: string) => {
+    const attachment = smartAttachments.find(a => a.id === attachmentId);
+    if (attachment) {
+      console.log(`Creating task for ${attachment.name}`);
+      setToastMessage(`Task created for ${attachment.name}`);
+      setTimeout(() => setToastMessage(null), 3000);
+    }
+  };
+
+  const handleExecuteQuickAction = (actionId: string) => {
+    const action = quickActions.find(a => a.id === actionId);
+    if (action) {
+      action.action();
+      setToastMessage(`Executed: ${action.label}`);
+      setTimeout(() => setToastMessage(null), 3000);
+    }
+  };
+
+  const handleDismissInsight = (insightId: string) => {
+    setAgenticInsights(prev => prev.filter(insight => insight.title !== insightId));
+  };
+
+  const handleSendChatMessage = (message: string) => {
+    const newMessage: ChatMessage = {
+      author: MessageAuthor.USER,
+      text: message
+    };
+    setMessages(prev => [...prev, newMessage]);
+    
+    // Simulate AI response
+    setTimeout(() => {
+      const aiResponse: ChatMessage = {
+        author: MessageAuthor.AI,
+        text: `I'll help you with: "${message}". Let me process that for you.`
+      };
+      setMessages(prev => [...prev, aiResponse]);
+    }, 1000);
+  };
+
 
   return (
     <div className="h-screen w-screen text-[var(--text-primary)] font-sans overflow-hidden flex flex-col">
@@ -568,15 +656,46 @@ const App: React.FC = () => {
                 flexShrink: 0,
             }}
         >
-          <EmailDetail 
-            email={selectedEmail}
-            onAction={(action, params) => executeAction({action, parameters: params})}
-            onCompose={(initialState) => { setComposeInitialState(initialState); setIsComposeOpen(true); }}
-            onSummarize={handleSummarize}
-            enableSummarization={agentConfig.enableSummarization}
-            enableQuickReplies={agentConfig.enableQuickReplies}
-            selectedEmailIds={selectedEmailIds}
-          />
+          {currentDashboardView === 'dashboard' ? (
+            <div className="p-4 h-full overflow-y-auto">
+              <InboxSummaryDashboard
+                summary={inboxSummary}
+                userName="Lanre"
+                recentMessages={messages}
+                onSendMessage={handleSendChatMessage}
+              />
+              <div className="mt-4">
+                <button 
+                  onClick={() => setCurrentDashboardView('emails')}
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 px-4 rounded-lg transition-colors"
+                >
+                  View Email Details
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="h-full flex flex-col">
+              <div className="p-4 border-b border-gray-700">
+                <button 
+                  onClick={() => setCurrentDashboardView('dashboard')}
+                  className="text-blue-400 hover:text-blue-300 text-sm flex items-center gap-2"
+                >
+                  ← Back to Dashboard
+                </button>
+              </div>
+              <div className="flex-1">
+                <EmailDetail 
+                  email={selectedEmail}
+                  onAction={(action, params) => executeAction({action, parameters: params})}
+                  onCompose={(initialState) => { setComposeInitialState(initialState); setIsComposeOpen(true); }}
+                  onSummarize={handleSummarize}
+                  enableSummarization={agentConfig.enableSummarization}
+                  enableQuickReplies={agentConfig.enableQuickReplies}
+                  selectedEmailIds={selectedEmailIds}
+                />
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="hidden md:flex group flex-shrink-0">
@@ -593,11 +712,38 @@ const App: React.FC = () => {
                 flexShrink: 0,
             }}
         >
-           <ChatAssistant 
-            messages={messages}
-            onSendMessage={handleUserMessage} 
-            isProcessing={isProcessing} 
-           />
+          <div className="flex flex-col h-full overflow-hidden">
+            <div className="flex-1 p-4 space-y-4 overflow-y-auto">
+              <AgenticActionsSidebar
+                quickActions={quickActions}
+                insights={agenticInsights}
+                onExecuteAction={handleExecuteQuickAction}
+                onDismissInsight={handleDismissInsight}
+              />
+              
+              <SubscriptionManager
+                subscriptions={subscriptions}
+                onUnsubscribe={handleUnsubscribe}
+                onToggleDigestMode={handleToggleDigestMode}
+              />
+              
+              <SmartFileAssistant
+                attachments={smartAttachments}
+                onConvertFile={handleConvertFile}
+                onExtractText={handleExtractText}
+                onSummarizeAndSend={handleSummarizeAndSend}
+                onCreateTask={handleCreateTask}
+              />
+            </div>
+            
+            <div className="border-t border-gray-700 p-4">
+              <ChatAssistant
+                messages={messages.slice(-3)}
+                onSendMessage={handleUserMessage}
+                isProcessing={isProcessing}
+              />
+            </div>
+          </div>
         </div>
       </div>
     </div>

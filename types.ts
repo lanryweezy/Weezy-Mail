@@ -19,6 +19,7 @@ export interface Email {
   recipient_email?: string;
   subject: string;
   body: string;
+  summary?: string;
   timestamp: string;
   status: EmailStatus;
   category?: EmailCategory;

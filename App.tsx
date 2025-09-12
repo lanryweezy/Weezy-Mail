@@ -8,7 +8,7 @@ import ChatAssistant from './components/ChatAssistant';
 import ComposeModal from './components/ComposeModal';
 import SettingsModal from './components/SettingsModal';
 import Resizer from './components/Resizer';
-import { processEmailCommand, generateQuickReplies, processSearchQuery, generateSuggestedActions } from './services/geminiService';
+import { processEmailCommand, generateQuickReplies, processSearchQuery, generateSuggestedActions, generateSummary } from './services/geminiService';
 
 const App: React.FC = () => {
   const [emails, setEmails] = useState<Email[]>(MOCK_EMAILS);
@@ -52,6 +52,36 @@ const App: React.FC = () => {
       setSuggestedActions([]);
     }
   }, [selectedEmail]);
+
+  // Effect to generate summaries for emails that don't have one
+  useEffect(() => {
+    const processNextEmail = async () => {
+      const emailToProcess = emails.find(e => !e.summary && e.body.length > 100);
+      if (!emailToProcess) {
+        return;
+      }
+
+      try {
+        const summary = await generateSummary(emailToProcess);
+        if (summary) {
+          setEmails(currentEmails =>
+            currentEmails.map(e =>
+              e.id === emailToProcess.id ? { ...e, summary } : e
+            )
+          );
+        }
+      } catch (error) {
+        console.error(`Failed to generate summary for email ${emailToProcess.id}:`, error);
+        // To prevent retrying a failed summary, we can set it to a special value or just leave it.
+        // For now, we'll just log the error and let it be retried next time.
+      }
+    };
+
+    // This timeout ensures we don't process a huge batch of emails all at once on initial load
+    const timeoutId = setTimeout(processNextEmail, 1000);
+    return () => clearTimeout(timeoutId);
+
+  }, [emails]);
 
 
   // --- Resizable panels state and logic ---

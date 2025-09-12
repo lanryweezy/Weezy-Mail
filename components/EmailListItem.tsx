@@ -90,8 +90,15 @@ const EmailListItem: React.FC<EmailListItemProps> = ({ email, isSelected, onSele
         >
           {email.subject}
         </p>
-        <p className="text-xs text-[var(--text-tertiary)] mt-1.5 truncate group-hover:text-slate-400 transition-colors">
-          {email.body}
+        <p className="text-xs text-[var(--text-tertiary)] mt-1.5 truncate group-hover:text-slate-400 transition-colors flex items-center gap-2">
+          {email.summary ? (
+            <>
+              <Icon name="sparkles" className="w-3 h-3 text-cyan-400/70 flex-shrink-0" />
+              <span className="truncate">{email.summary}</span>
+            </>
+          ) : (
+            <span className="truncate">{email.body}</span>
+          )}
         </p>
       </div>
       <div className="absolute top-1/2 -translate-y-1/2 right-4 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200">

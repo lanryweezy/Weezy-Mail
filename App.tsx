@@ -8,7 +8,7 @@ import ChatAssistant from './components/ChatAssistant';
 import ComposeModal from './components/ComposeModal';
 import SettingsModal from './components/SettingsModal';
 import Resizer from './components/Resizer';
-import { processEmailCommand, generateQuickReplies, processSearchQuery } from './services/geminiService';
+import { processEmailCommand, generateQuickReplies, processSearchQuery, generateSuggestedActions } from './services/geminiService';
 
 const App: React.FC = () => {
   const [emails, setEmails] = useState<Email[]>(MOCK_EMAILS);
@@ -39,10 +39,19 @@ const App: React.FC = () => {
       enableQuickReplies: true,
       enableSummarization: true
   });
+  const [suggestedActions, setSuggestedActions] = useState<string[]>([]);
   
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
   }, [theme]);
+
+  useEffect(() => {
+    if (selectedEmail) {
+      generateSuggestedActions(selectedEmail).then(setSuggestedActions);
+    } else {
+      setSuggestedActions([]);
+    }
+  }, [selectedEmail]);
 
 
   // --- Resizable panels state and logic ---
@@ -551,6 +560,7 @@ const App: React.FC = () => {
             selectedEmailIds={selectedEmailIds}
             onToggleSelectId={handleToggleSelectId}
             onToggleSelectAll={handleToggleSelectAll}
+            onAction={(action, params) => executeAction({ action, parameters: params })}
           />
         </div>
 
@@ -596,7 +606,8 @@ const App: React.FC = () => {
            <ChatAssistant 
             messages={messages}
             onSendMessage={handleUserMessage} 
-            isProcessing={isProcessing} 
+            isProcessing={isProcessing}
+            suggestedActions={suggestedActions}
            />
         </div>
       </div>

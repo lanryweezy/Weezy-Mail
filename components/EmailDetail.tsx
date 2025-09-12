@@ -98,9 +98,14 @@ const EmailDetail: React.FC<EmailDetailProps> = (props) => {
     );
   }
 
-  const handleReply = (replyBody?: string) => {
+  const handleReply = (replyBody?: string, isReplyAll: boolean = false) => {
+    let recipients = [email.sender_email];
+    if (isReplyAll && email.recipient_email) {
+      recipients = [...new Set([...recipients, email.recipient_email])];
+    }
+
     onCompose({
-      recipient: email.sender_email,
+      recipient: recipients.join(', '),
       subject: `Re: ${email.subject}`,
       body: `${replyBody ? replyBody + '\n\n' : '\n\n'}---- On ${new Date(email.timestamp).toLocaleString()}, ${email.sender} wrote: ----\n>${email.body.replace(/\n/g, '\n>')}`
     });
@@ -161,6 +166,7 @@ const EmailDetail: React.FC<EmailDetailProps> = (props) => {
         </div>
          <div className="flex items-center gap-2 flex-wrap">
               <ActionButton icon="reply" label="Reply" onClick={() => handleReply()} />
+              <ActionButton icon="reply-all" label="Reply All" onClick={() => handleReply(undefined, true)} />
               <ActionButton icon="forward" label="Forward" onClick={handleForward} />
               {enableSummarization && <ActionButton icon="document-text" label="Summarize" onClick={() => onSummarize(email.id)} />}
               {email.status !== EmailStatus.TRASH && <ActionButton icon="trash" label="Delete" onClick={() => onAction(AIAction.DELETE_EMAIL, {emailId: email.id})} />}

@@ -74,6 +74,8 @@ const AiSearchPill: React.FC<{ criteria: AISearchCriteria; onClear: () => void }
 
 // --- Main MailboxPanel Component ---
 
+import { AIAction } from '../types';
+
 interface MailboxPanelProps {
   emails: Email[]; // All emails for counts
   visibleEmails: Email[]; // Filtered emails to display
@@ -93,6 +95,7 @@ interface MailboxPanelProps {
   selectedEmailIds: Set<number>;
   onToggleSelectId: (id: number) => void;
   onToggleSelectAll: () => void;
+  onAction: (action: AIAction, params: any) => void;
 }
 
 const MailboxPanel: React.FC<MailboxPanelProps> = (props) => {
@@ -100,7 +103,7 @@ const MailboxPanel: React.FC<MailboxPanelProps> = (props) => {
         emails, visibleEmails, currentView, onSetView, onCompose, onOpenSettings,
         onSelectEmail, selectedEmailId, onAiSearch, isSearching, aiCriteria,
         searchQuery, onClearSearch, activeCategory, onSetCategory,
-        selectedEmailIds, onToggleSelectId, onToggleSelectAll,
+        selectedEmailIds, onToggleSelectId, onToggleSelectAll, onAction,
     } = props;
 
   const primaryUnreadCount = emails.filter(e => e.status === EmailStatus.UNREAD && e.category === 'PRIMARY').length;
@@ -201,6 +204,7 @@ const MailboxPanel: React.FC<MailboxPanelProps> = (props) => {
                     onSelect={() => onSelectEmail(email)}
                     isChecked={selectedEmailIds.has(email.id)}
                     onToggleSelect={onToggleSelectId}
+                    onAction={onAction}
                 />
                 ))}
             </ul>

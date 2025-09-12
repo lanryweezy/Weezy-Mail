@@ -290,3 +290,39 @@ Supported keys are:
         return { keyword: query };
     }
 };
+
+export const generateSuggestedActions = async (email: Email): Promise<string[]> => {
+    const systemInstruction = `You are an AI assistant that suggests contextual actions for an email. Based on the email's content, suggest 3-5 relevant actions the user could take. The actions should be phrased as commands for another AI agent.
+
+Examples:
+- If the email is a newsletter, suggest "Unsubscribe from this newsletter".
+- If it's a meeting invite, suggest "Accept meeting" or "Decline meeting".
+- If it's a question, suggest "Answer this question".
+- If it contains a link, suggest "Open link in browser".
+
+Return ONLY a JSON array of strings.`;
+
+    const schema = {
+        type: Type.ARRAY,
+        items: { type: Type.STRING }
+    };
+
+    try {
+        const response = await ai.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: [{ text: `From: ${email.sender}\nSubject: ${email.subject}\n\n${email.body.substring(0, 500)}` }],
+            config: {
+                systemInstruction,
+                responseMimeType: "application/json",
+                responseSchema: schema,
+                temperature: 0.7,
+            },
+        });
+        const jsonText = response.text.trim();
+        const actions = JSON.parse(jsonText) as string[];
+        return actions.slice(0, 5);
+    } catch (error) {
+        console.error("Error generating suggested actions:", error);
+        return [];
+    }
+};

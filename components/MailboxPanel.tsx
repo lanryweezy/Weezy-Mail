@@ -85,6 +85,7 @@ interface MailboxPanelProps {
   onOpenSettings: () => void;
   onSelectEmail: (email: Email) => void;
   selectedEmailId?: number | null;
+  highlightedEmailId?: number | null;
   onAiSearch: (query: string) => void;
   isSearching: boolean;
   aiCriteria: AISearchCriteria | null;
@@ -101,7 +102,7 @@ interface MailboxPanelProps {
 const MailboxPanel: React.FC<MailboxPanelProps> = (props) => {
     const {
         emails, visibleEmails, currentView, onSetView, onCompose, onOpenSettings,
-        onSelectEmail, selectedEmailId, onAiSearch, isSearching, aiCriteria,
+        onSelectEmail, selectedEmailId, highlightedEmailId, onAiSearch, isSearching, aiCriteria,
         searchQuery, onClearSearch, activeCategory, onSetCategory,
         selectedEmailIds, onToggleSelectId, onToggleSelectAll, onAction,
     } = props;
@@ -201,6 +202,7 @@ const MailboxPanel: React.FC<MailboxPanelProps> = (props) => {
                     key={email.id}
                     email={email}
                     isSelected={email.id === selectedEmailId}
+                    isHighlighted={email.id === highlightedEmailId}
                     onSelect={() => onSelectEmail(email)}
                     isChecked={selectedEmailIds.has(email.id)}
                     onToggleSelect={onToggleSelectId}

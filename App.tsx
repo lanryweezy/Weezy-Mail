@@ -13,6 +13,7 @@ import { processEmailCommand, generateQuickReplies, processSearchQuery, generate
 const App: React.FC = () => {
   const [emails, setEmails] = useState<Email[]>(MOCK_EMAILS);
   const [selectedEmailId, setSelectedEmailId] = useState<number | null>(1);
+  const [highlightedEmailId, setHighlightedEmailId] = useState<number | null>(null);
   const [selectedEmailIds, setSelectedEmailIds] = useState<Set<number>>(new Set());
   const [currentView, setCurrentView] = useState<MailboxView>('INBOX');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -108,6 +109,85 @@ const App: React.FC = () => {
     return () => clearTimeout(timeoutId);
 
   }, [emails]);
+
+
+  // --- Keyboard Shortcut Handler ---
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      // Ignore shortcuts if user is typing in an input
+      const target = event.target as HTMLElement;
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
+        return;
+      }
+      // Shortcut logic
+      switch (event.key) {
+        case 'j': { // Move down
+          event.preventDefault();
+          const currentIdx = visibleEmails.findIndex(e => e.id === (highlightedEmailId ?? selectedEmailId));
+          const nextIdx = Math.min(currentIdx + 1, visibleEmails.length - 1);
+          if (nextIdx !== currentIdx) {
+            setHighlightedEmailId(visibleEmails[nextIdx].id);
+          }
+          break;
+        }
+        case 'k': { // Move up
+          event.preventDefault();
+          const currentIdx = visibleEmails.findIndex(e => e.id === (highlightedEmailId ?? selectedEmailId));
+          const nextIdx = Math.max(currentIdx - 1, 0);
+           if (nextIdx !== currentIdx) {
+            setHighlightedEmailId(visibleEmails[nextIdx].id);
+          }
+          break;
+        }
+        case 'o':
+        case 'Enter': {
+            event.preventDefault();
+            const emailToSelect = visibleEmails.find(e => e.id === highlightedEmailId);
+            if (emailToSelect) {
+                handleSelectEmail(emailToSelect);
+            }
+            break;
+        }
+        case 'c': {
+            event.preventDefault();
+            setComposeInitialState({});
+            setIsComposeOpen(true);
+            break;
+        }
+        case '#': {
+            if (selectedEmail) {
+                event.preventDefault();
+                executeAction({ action: AIAction.DELETE_EMAIL, parameters: { emailId: selectedEmail.id } });
+            }
+            break;
+        }
+        case 'e': {
+            if (selectedEmail) {
+                event.preventDefault();
+                executeAction({ action: AIAction.ARCHIVE_EMAIL, parameters: { emailId: selectedEmail.id } });
+            }
+            break;
+        }
+        case 'r': {
+            if (selectedEmail) {
+                event.preventDefault();
+                setComposeInitialState({
+                    recipient: selectedEmail.sender_email,
+                    subject: `Re: ${selectedEmail.subject}`,
+                    body: `\n\n---- On ${new Date(selectedEmail.timestamp).toLocaleString()}, ${selectedEmail.sender} wrote: ----\n>${selectedEmail.body.replace(/\n/g, '\n>')}`
+                });
+                setIsComposeOpen(true);
+            }
+            break;
+        }
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [visibleEmails, highlightedEmailId, selectedEmailId]);
 
 
   // --- Resizable panels state and logic ---
@@ -602,12 +682,14 @@ const App: React.FC = () => {
                 setAiSearchCriteria(null);
                 setSearchQuery('');
                 setSelectedEmailId(null);
+                setHighlightedEmailId(null);
                 setSelectedEmailIds(new Set());
             }}
             onCompose={() => { setComposeInitialState({}); setIsComposeOpen(true); }}
             onOpenSettings={() => setIsSettingsOpen(true)}
             onSelectEmail={handleSelectEmail}
             selectedEmailId={selectedEmailId}
+            highlightedEmailId={highlightedEmailId}
             onAiSearch={handleAiSearch}
             isSearching={isSearching}
             aiCriteria={aiSearchCriteria}

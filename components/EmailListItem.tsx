@@ -6,6 +6,7 @@ import Icon from './Icon';
 interface EmailListItemProps {
   email: Email;
   isSelected: boolean;
+  isHighlighted: boolean;
   onSelect: () => void;
   isChecked: boolean;
   onToggleSelect: (id: number) => void;
@@ -22,7 +23,7 @@ const QuickActionButton: React.FC<{icon: any, label: string, onClick: (e: React.
 );
 
 
-const EmailListItem: React.FC<EmailListItemProps> = ({ email, isSelected, onSelect, isChecked, onToggleSelect, onAction }) => {
+const EmailListItem: React.FC<EmailListItemProps> = ({ email, isSelected, isHighlighted, onSelect, isChecked, onToggleSelect, onAction }) => {
   const isUnread = email.status === EmailStatus.UNREAD;
   const isImportant = email.status === EmailStatus.IMPORTANT;
 
@@ -34,14 +35,16 @@ const EmailListItem: React.FC<EmailListItemProps> = ({ email, isSelected, onSele
   // Improved styling for a more futuristic look
   const itemClasses = `
     p-4 rounded-lg cursor-pointer transition-all duration-300 ease-in-out
-    border border-transparent relative flex items-start gap-4
+    border-2 border-transparent relative flex items-start gap-4
     group
     ${
       isSelected
         ? 'bg-[var(--accent-cyan)]/10 border-[var(--accent-cyan)]/50 shadow-lg shadow-[var(--accent-cyan)]/10'
+        : isHighlighted
+        ? 'border-[var(--accent-cyan)]/70'
         : isChecked
         ? 'bg-blue-500/10'
-        : 'hover:bg-white/5 hover:border-[var(--border-glow)]'
+        : 'hover:bg-white/5'
     }
   `;
 

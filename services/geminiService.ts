@@ -1,5 +1,5 @@
 import { GoogleGenAI, Type } from "@google/genai";
-import { Email, AIActionResponse, ChatMessage, MessageAuthor, MailboxView, AIAction, EmailCategory, AISearchCriteria, AgentPersonality } from '../types';
+import { Email, AIActionResponse, ChatMessage, MessageAuthor, MailboxView, AIAction, EmailCategory, AISearchCriteria, AgentPersonality, DetectedTask } from '../types';
 
 const API_KEY = process.env.API_KEY;
 
@@ -205,6 +205,54 @@ Example Output: ["Sounds great, I'm available.", "I'm busy tomorrow, can we do n
 
     } catch (error) {
         console.error("Error generating quick replies:", error);
+        return [];
+    }
+};
+
+export const detectTasksInEmail = async (email: Email): Promise<DetectedTask[]> => {
+    const systemInstruction = `You are an AI assistant that detects tasks, events, and deadlines in emails. Analyze the email and extract any actionable items.
+- A 'DEADLINE' involves a specific date by which something must be done (e.g., "review by Friday").
+- An 'EVENT' is a meeting or appointment at a specific time (e.g., "meeting tomorrow at 3pm").
+- A 'REMINDER' is a general task without a strict deadline (e.g., "don't forget to send the file").
+- If a date or time is present, convert it to a full ISO 8601 string.
+- If no tasks are found, return an empty array.
+- Return a JSON object with a "tasks" key, containing an array of detected task objects.`;
+
+    const schema = {
+        type: Type.OBJECT,
+        properties: {
+            tasks: {
+                type: Type.ARRAY,
+                items: {
+                    type: Type.OBJECT,
+                    properties: {
+                        type: { type: Type.STRING, enum: ['REMINDER', 'EVENT', 'DEADLINE'] },
+                        description: { type: Type.STRING },
+                        date: { type: Type.STRING, nullable: true },
+                    },
+                    required: ['type', 'description']
+                }
+            }
+        },
+        required: ['tasks']
+    };
+
+    try {
+        const response = await ai.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: [{ text: `Current Time: ${new Date().toISOString()}\n\nFrom: ${email.sender}\nSubject: ${email.subject}\n\n${email.body}` }],
+            config: {
+                systemInstruction,
+                responseMimeType: "application/json",
+                responseSchema: schema,
+                temperature: 0.1,
+            },
+        });
+        const jsonText = response.text.trim();
+        const result = JSON.parse(jsonText);
+        return result.tasks as DetectedTask[];
+    } catch (error) {
+        console.error("Error detecting tasks:", error);
         return [];
     }
 };

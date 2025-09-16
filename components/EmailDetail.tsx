@@ -1,8 +1,9 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Email, EmailStatus, AIAction } from '../types';
+import { Email, EmailStatus, AIAction, DetectedTask } from '../types';
 import Icon from './Icon';
 import { generateQuickReplies } from '../services/geminiService';
+import DetectedTaskPill from './DetectedTaskPill';
 
 
 interface EmailDetailProps {
@@ -149,6 +150,12 @@ const EmailDetail: React.FC<EmailDetailProps> = (props) => {
     setIsSnoozeMenuOpen(false);
   }
 
+  const handleTaskAction = (task: DetectedTask) => {
+    // In a real app, this would trigger a calendar integration or a to-do list modal.
+    // For now, we'll just use the onAction prop to show a toast message.
+    onAction(AIAction.NO_ACTION, { toast: `Action for task "${task.description}" triggered!` });
+  };
+
   const SnoozeMenuItem: React.FC<{label: string, onClick: () => void}> = ({ label, onClick }) => (
     <button onClick={onClick} className="w-full text-left px-4 py-2 text-sm text-[var(--text-secondary)] hover:bg-white/10 hover:text-white transition-colors rounded-md">
         {label}
@@ -203,6 +210,20 @@ const EmailDetail: React.FC<EmailDetailProps> = (props) => {
         </span>
       </div>
       <div className="flex-grow pt-4 text-[var(--text-secondary)] leading-relaxed overflow-y-auto">
+        {email.detectedTasks && email.detectedTasks.length > 0 && (
+          <div className="mb-6">
+            <h3 className="font-semibold text-white mb-3 flex items-center gap-2">
+              <Icon name="sparkles" className="w-5 h-5 text-cyan-400" />
+              Detected Actions
+            </h3>
+            <div className="flex flex-col gap-2">
+              {email.detectedTasks.map((task, index) => (
+                <DetectedTaskPill key={index} task={task} onAction={handleTaskAction} />
+              ))}
+            </div>
+          </div>
+        )}
+
         <p className="whitespace-pre-wrap text-sm">{email.body}</p>
 
         {email.attachments && email.attachments.length > 0 && (

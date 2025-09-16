@@ -8,7 +8,7 @@ import ChatAssistant from './components/ChatAssistant';
 import ComposeModal from './components/ComposeModal';
 import SettingsModal from './components/SettingsModal';
 import Resizer from './components/Resizer';
-import { processEmailCommand, generateQuickReplies, processSearchQuery, generateSuggestedActions, generateSummary } from './services/geminiService';
+import { processEmailCommand, generateQuickReplies, processSearchQuery, generateSuggestedActions, generateSummary, detectTasksInEmail } from './services/geminiService';
 
 const App: React.FC = () => {
   const [emails, setEmails] = useState<Email[]>(MOCK_EMAILS);
@@ -50,6 +50,32 @@ const App: React.FC = () => {
       generateSuggestedActions(selectedEmail).then(setSuggestedActions);
     } else {
       setSuggestedActions([]);
+    }
+  }, [selectedEmail]);
+
+  // Effect to detect tasks in the selected email
+  useEffect(() => {
+    if (selectedEmail && selectedEmail.detectedTasks === undefined) {
+      detectTasksInEmail(selectedEmail).then(tasks => {
+        setEmails(currentEmails =>
+          currentEmails.map(e => {
+            if (e.id === selectedEmail.id) {
+              // Set detectedTasks to the result (even if it's an empty array)
+              // to prevent re-running the detection.
+              return { ...e, detectedTasks: tasks };
+            }
+            return e;
+          })
+        );
+      }).catch(error => {
+          console.error(`Failed to detect tasks for email ${selectedEmail.id}:`, error);
+          // Set to an empty array on error to prevent retries
+          setEmails(currentEmails =>
+            currentEmails.map(e =>
+              e.id === selectedEmail.id ? { ...e, detectedTasks: [] } : e
+            )
+          );
+      });
     }
   }, [selectedEmail]);
 
@@ -252,7 +278,9 @@ const App: React.FC = () => {
     const singleTargetId = targetIds[0];
 
     // --- Show Toast Messages ---
-    if (![AIAction.NO_ACTION, AIAction.SUMMARIZE_EMAILS, AIAction.FIND_EMAILS, AIAction.CHANGE_VIEW, AIAction.ANSWER_QUESTION_FROM_EMAIL].includes(action)) {
+    if (params?.toast) {
+        showToast(params.toast);
+    } else if (![AIAction.NO_ACTION, AIAction.SUMMARIZE_EMAILS, AIAction.FIND_EMAILS, AIAction.CHANGE_VIEW, AIAction.ANSWER_QUESTION_FROM_EMAIL].includes(action)) {
         if (isBulkAction) {
             showToast(`${targetIds.length} items updated.`);
         } else {

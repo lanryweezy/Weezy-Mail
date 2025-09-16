@@ -25,6 +25,15 @@ export interface Email {
   category?: EmailCategory;
   snoozedUntil?: string;
   attachments?: string[];
+  detectedTasks?: DetectedTask[];
+}
+
+export type DetectedTaskType = 'REMINDER' | 'EVENT' | 'DEADLINE';
+
+export interface DetectedTask {
+  type: DetectedTaskType;
+  description: string;
+  date?: string; // ISO 8601 format
 }
 
 export enum MessageAuthor {

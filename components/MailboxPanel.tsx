@@ -80,6 +80,7 @@ interface MailboxPanelProps {
   emails: Email[]; // All emails for counts
   visibleEmails: Email[]; // Filtered emails to display
   currentView: MailboxView;
+  isViewTransitioning: boolean;
   onSetView: (view: MailboxView) => void;
   onCompose: () => void;
   onOpenSettings: () => void;
@@ -101,7 +102,7 @@ interface MailboxPanelProps {
 
 const MailboxPanel: React.FC<MailboxPanelProps> = (props) => {
     const {
-        emails, visibleEmails, currentView, onSetView, onCompose, onOpenSettings,
+        emails, visibleEmails, currentView, isViewTransitioning, onSetView, onCompose, onOpenSettings,
         onSelectEmail, selectedEmailId, highlightedEmailId, onAiSearch, isSearching, aiCriteria,
         searchQuery, onClearSearch, activeCategory, onSetCategory,
         selectedEmailIds, onToggleSelectId, onToggleSelectAll, onAction,
@@ -139,7 +140,7 @@ const MailboxPanel: React.FC<MailboxPanelProps> = (props) => {
         <div className="px-2 mb-4">
           <button 
             onClick={onCompose}
-            className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-blue-600 to-cyan-500 text-white font-bold py-3 px-4 rounded-lg hover:shadow-lg hover:shadow-cyan-500/20 transition-all duration-300 transform hover:-translate-y-0.5"
+            className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-blue-600 to-cyan-500 text-white font-bold py-3 px-4 rounded-lg hover:shadow-lg hover:shadow-cyan-500/20 transition-all duration-300 transform hover:-translate-y-0.5 active:scale-95"
           >
             <Icon name="pencil" className="w-5 h-5" />
             <span>Compose</span>
@@ -196,7 +197,7 @@ const MailboxPanel: React.FC<MailboxPanelProps> = (props) => {
                     className="w-4 h-4 rounded bg-white/10 border-slate-500 text-[var(--accent-cyan)] focus:ring-0 focus:ring-offset-0 cursor-pointer"
                 />
             </div>
-            <ul className="p-1 space-y-1">
+            <ul className={`p-1 space-y-1 transition-opacity duration-200 ${isViewTransitioning ? 'opacity-0' : 'opacity-100'}`}>
                 {visibleEmails.map(email => (
                 <EmailListItem
                     key={email.id}

@@ -16,6 +16,7 @@ const App: React.FC = () => {
   const [highlightedEmailId, setHighlightedEmailId] = useState<number | null>(null);
   const [selectedEmailIds, setSelectedEmailIds] = useState<Set<number>>(new Set());
   const [currentView, setCurrentView] = useState<MailboxView>('INBOX');
+  const [isViewTransitioning, setIsViewTransitioning] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [undoAction, setUndoAction] = useState<{ emailIds: number[], previousStatus: EmailStatus } | null>(null);
@@ -192,90 +193,68 @@ const App: React.FC = () => {
 
   // --- Resizable panels state and logic ---
   const [panelWidths, setPanelWidths] = useState([25, 42, 33]);
-  const isResizing = useRef<number | null>(null);
-  const startPos = useRef(0);
-  const initialWidths = useRef<number[]>([]);
-  
+  const isResizingRef = useRef<number | null>(null);
+
   const containerRef = useRef<HTMLDivElement>(null);
-  const panel1Ref = useRef<HTMLDivElement>(null);
-  const panel2Ref = useRef<HTMLDivElement>(null);
-  const panel3Ref = useRef<HTMLDivElement>(null);
+  const panelRefs = [useRef<HTMLDivElement>(null), useRef<HTMLDivElement>(null), useRef<HTMLDivElement>(null)];
   const MIN_PANEL_WIDTH_PX = 240;
 
-  const handleMouseMove = useCallback((e: MouseEvent) => {
-    if (isResizing.current === null || !containerRef.current) return;
-
-    const panelRefs = [panel1Ref, panel2Ref, panel3Ref];
-    const leftPanel = panelRefs[isResizing.current]?.current;
-    const rightPanel = panelRefs[isResizing.current + 1]?.current;
-
-    if (!leftPanel || !rightPanel) return;
-
-    const delta = e.clientX - startPos.current;
-    const containerWidth = containerRef.current.offsetWidth;
-    if (containerWidth === 0) return;
-
-    const deltaPercent = (delta / containerWidth) * 100;
-    
-    const resizerIndex = isResizing.current;
-    const leftPanelIndex = resizerIndex;
-    const rightPanelIndex = resizerIndex + 1;
-
-    const widths = [...initialWidths.current];
-    const combinedWidth = widths[leftPanelIndex] + widths[rightPanelIndex];
-    const minWidthPercent = (MIN_PANEL_WIDTH_PX / containerWidth) * 100;
-
-    let newLeftWidth = widths[leftPanelIndex] + deltaPercent;
-
-    if (newLeftWidth < minWidthPercent) {
-        newLeftWidth = minWidthPercent;
-    }
-    
-    if (newLeftWidth > combinedWidth - minWidthPercent) {
-        newLeftWidth = combinedWidth - minWidthPercent;
-    }
-
-    const newRightWidth = combinedWidth - newLeftWidth;
-    
-    leftPanel.style.flexBasis = `${newLeftWidth}%`;
-    rightPanel.style.flexBasis = `${newRightWidth}%`;
-  }, []);
-
-  const handleMouseUp = useCallback(() => {
-    if (isResizing.current === null) return;
-    
-    const panelElements = [panel1Ref.current, panel2Ref.current, panel3Ref.current];
-    const newWidths = panelElements.map(el => {
-        if (!el) return 0;
-        return parseFloat(el.style.flexBasis);
-    });
-
-    if (newWidths.every(w => !isNaN(w) && w > 0)) {
-        setPanelWidths(newWidths);
-    }
-    
-    isResizing.current = null;
-    window.removeEventListener('mousemove', handleMouseMove);
-    window.removeEventListener('mouseup', handleMouseUp);
-  }, [handleMouseMove]);
-
   const handleMouseDown = useCallback((index: number, e: React.MouseEvent) => {
-    isResizing.current = index;
-    startPos.current = e.clientX;
-    initialWidths.current = [...panelWidths];
     e.preventDefault();
+    isResizingRef.current = index;
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
 
-    window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mouseup', handleMouseUp);
-  }, [panelWidths, handleMouseMove, handleMouseUp]);
+    const handleMouseMove = (event: MouseEvent) => {
+        if (isResizingRef.current === null || !containerRef.current) return;
 
+        const leftPanel = panelRefs[isResizingRef.current]?.current;
+        const rightPanel = panelRefs[isResizingRef.current + 1]?.current;
 
-  useEffect(() => {
-    return () => {
+        if (!leftPanel || !rightPanel) return;
+
+        const containerWidth = containerRef.current.offsetWidth;
+        const leftPanelRect = leftPanel.getBoundingClientRect();
+        const rightPanelRect = rightPanel.getBoundingClientRect();
+
+        const combinedWidth = leftPanelRect.width + rightPanelRect.width;
+
+        const newLeftWidth = event.clientX - leftPanelRect.left;
+
+        if (newLeftWidth > MIN_PANEL_WIDTH_PX && (combinedWidth - newLeftWidth) > MIN_PANEL_WIDTH_PX) {
+            const newLeftPercent = (newLeftWidth / containerWidth) * 100;
+            const newRightPercent = ((combinedWidth - newLeftWidth) / containerWidth) * 100;
+            leftPanel.style.flexBasis = `${newLeftPercent}%`;
+            rightPanel.style.flexBasis = `${newRightPercent}%`;
+        }
+    };
+
+    const handleMouseUp = () => {
+        isResizingRef.current = null;
+        document.body.style.cursor = 'auto';
+        document.body.style.userSelect = 'auto';
+
+        // Update React state with the final widths from the DOM
+        const newWidths = panelRefs.map(ref => {
+            if (ref.current) {
+                return (ref.current.offsetWidth / containerRef.current!.offsetWidth) * 100;
+            }
+            return 0;
+        });
+
+        // Only update state if the widths are valid
+        if (newWidths.every(w => w > 0)) {
+            setPanelWidths(newWidths);
+        }
+
         window.removeEventListener('mousemove', handleMouseMove);
         window.removeEventListener('mouseup', handleMouseUp);
     };
-  }, [handleMouseMove, handleMouseUp]);
+
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+
+  }, [panelRefs]);
 
 
   const showToast = (message: string, duration: number = 3000) => {
@@ -327,6 +306,21 @@ const App: React.FC = () => {
   }, []);
 
   const selectedEmail = useMemo(() => emails.find(e => e.id === selectedEmailId) || null, [emails, selectedEmailId]);
+
+  const handleSetView = (view: MailboxView) => {
+    if (view === currentView) return;
+
+    setIsViewTransitioning(true);
+    setTimeout(() => {
+      setCurrentView(view);
+      setAiSearchCriteria(null);
+      setSearchQuery('');
+      setSelectedEmailId(null);
+      setHighlightedEmailId(null);
+      setSelectedEmailIds(new Set());
+      setIsViewTransitioning(false);
+    }, 200); // Duration should match the fade-out animation
+  };
 
   const handleSelectEmail = (email: Email) => {
     if (email.status === EmailStatus.DRAFT) {
@@ -664,11 +658,12 @@ const App: React.FC = () => {
 
       <div ref={containerRef} className="flex-grow w-full h-full flex flex-col md:flex-row p-4 gap-4 md:gap-0">
         <div
-            ref={panel1Ref}
+            ref={panelRefs[0]}
             className="bg-[var(--bg-panel)] border border-[var(--border-glow)] rounded-2xl overflow-hidden flex flex-col backdrop-blur-xl animate-slow-fade-in md:h-auto" 
             style={{
                 animationDelay: '100ms',
                 flexBasis: `${panelWidths[0]}%`,
+                transition: 'flex-basis 0.3s ease-in-out',
                 minWidth: `${MIN_PANEL_WIDTH_PX}px`,
                 flexShrink: 0,
             }}
@@ -677,14 +672,8 @@ const App: React.FC = () => {
             emails={emails}
             visibleEmails={visibleEmails}
             currentView={currentView}
-            onSetView={(view) => {
-                setCurrentView(view);
-                setAiSearchCriteria(null);
-                setSearchQuery('');
-                setSelectedEmailId(null);
-                setHighlightedEmailId(null);
-                setSelectedEmailIds(new Set());
-            }}
+            isViewTransitioning={isViewTransitioning}
+            onSetView={handleSetView}
             onCompose={() => { setComposeInitialState({}); setIsComposeOpen(true); }}
             onOpenSettings={() => setIsSettingsOpen(true)}
             onSelectEmail={handleSelectEmail}
@@ -709,16 +698,18 @@ const App: React.FC = () => {
         </div>
 
         <div
-            ref={panel2Ref}
+            ref={panelRefs[1]}
             className="bg-[var(--bg-panel)] border border-[var(--border-glow)] rounded-2xl overflow-hidden flex flex-col backdrop-blur-xl animate-slow-fade-in md:h-auto" 
             style={{
                 animationDelay: '200ms',
                 flexBasis: `${panelWidths[1]}%`,
+                transition: 'flex-basis 0.3s ease-in-out',
                 minWidth: `${MIN_PANEL_WIDTH_PX}px`,
                 flexShrink: 0,
             }}
         >
           <EmailDetail 
+            key={selectedEmailId}
             email={selectedEmail}
             onAction={(action, params) => executeAction({action, parameters: params})}
             onCompose={(initialState) => { setComposeInitialState(initialState); setIsComposeOpen(true); }}
@@ -734,11 +725,12 @@ const App: React.FC = () => {
         </div>
 
         <div
-            ref={panel3Ref}
+            ref={panelRefs[2]}
             className="bg-[var(--bg-panel)] border border-[var(--border-glow)] rounded-2xl flex flex-col backdrop-blur-xl animate-slow-fade-in md:h-auto"
             style={{
                 animationDelay: '300ms',
                 flexBasis: `${panelWidths[2]}%`,
+                transition: 'flex-basis 0.3s ease-in-out',
                 minWidth: `${MIN_PANEL_WIDTH_PX}px`,
                 flexShrink: 0,
             }}

@@ -17,8 +17,8 @@ interface EmailDetailProps {
 }
 
 const ActionButton: React.FC<{icon: any, label: string, onClick: () => void, className?: string, buttonRef?: React.Ref<HTMLButtonElement>}> = ({ icon, label, onClick, className = '', buttonRef }) => (
-    <button ref={buttonRef} onClick={onClick} className={`group relative flex items-center justify-center w-10 h-10 rounded-full bg-white/5 hover:bg-white/10 transition-colors text-[var(--text-secondary)] hover:text-white ${className}`}>
-        <Icon name={icon} className="w-5 h-5" />
+    <button ref={buttonRef} onClick={onClick} className={`group relative flex items-center justify-center w-10 h-10 rounded-full bg-white/5 hover:bg-[var(--accent-cyan)]/20 transition-all duration-200 text-[var(--text-secondary)] hover:text-[var(--accent-cyan)] active:scale-90 ${className}`}>
+        <Icon name={icon} className="w-5 h-5 transition-transform group-hover:scale-110" />
         <span className="absolute -top-8 left-1/2 -translate-x-1/2 whitespace-nowrap bg-black/80 text-white text-xs px-2 py-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
             {label}
         </span>

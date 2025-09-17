@@ -14,8 +14,8 @@ interface EmailListItemProps {
 }
 
 const QuickActionButton: React.FC<{icon: any, label: string, onClick: (e: React.MouseEvent) => void}> = ({ icon, label, onClick }) => (
-    <button onClick={onClick} className="group relative flex items-center justify-center w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 transition-colors text-[var(--text-secondary)] hover:text-white">
-        <Icon name={icon} className="w-4 h-4" />
+    <button onClick={onClick} className="group relative flex items-center justify-center w-8 h-8 rounded-full bg-white/10 hover:bg-[var(--accent-cyan)]/20 transition-all duration-200 text-[var(--text-secondary)] hover:text-[var(--accent-cyan)] active:scale-90">
+        <Icon name={icon} className="w-4 h-4 transition-transform group-hover:scale-110" />
         <span className="absolute -top-8 left-1/2 -translate-x-1/2 whitespace-nowrap bg-black/80 text-white text-xs px-2 py-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">
             {label}
         </span>

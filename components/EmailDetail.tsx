@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Email, EmailStatus, AIAction, DetectedTask } from '../types';
+import { Email, EmailStatus, AIAction, DetectedTask, CalendarEvent } from '../types';
 import Icon from './Icon';
 import { generateQuickReplies } from '../services/geminiService';
 import DetectedTaskPill from './DetectedTaskPill';
@@ -11,6 +11,7 @@ interface EmailDetailProps {
   onAction: (action: AIAction, params: any) => void;
   onCompose: (initialState: any) => void;
   onSummarize: (emailId: number) => void;
+  onAddEvent: (event: Omit<CalendarEvent, 'id'>) => void;
   enableSummarization: boolean;
   enableQuickReplies: boolean;
   selectedEmailIds: Set<number>;
@@ -44,7 +45,7 @@ const BulkActionBar: React.FC<{count: number; onAction: (action: AIAction, param
 
 
 const EmailDetail: React.FC<EmailDetailProps> = (props) => {
-  const { email, onAction, onCompose, onSummarize, enableSummarization, enableQuickReplies, selectedEmailIds } = props;
+  const { email, onAction, onCompose, onSummarize, onAddEvent, enableSummarization, enableQuickReplies, selectedEmailIds } = props;
   const [isSnoozeMenuOpen, setIsSnoozeMenuOpen] = useState(false);
   const snoozeMenuRef = useRef<HTMLDivElement>(null);
   const [quickReplies, setQuickReplies] = useState<string[]>([]);
@@ -151,9 +152,21 @@ const EmailDetail: React.FC<EmailDetailProps> = (props) => {
   }
 
   const handleTaskAction = (task: DetectedTask) => {
-    // In a real app, this would trigger a calendar integration or a to-do list modal.
-    // For now, we'll just use the onAction prop to show a toast message.
-    onAction(AIAction.NO_ACTION, { toast: `Action for task "${task.description}" triggered!` });
+    if (task.type === 'EVENT' && task.date) {
+        const startTime = new Date(task.date);
+        // Default to a 1-hour event if no end time is detected
+        const endTime = new Date(startTime.getTime() + 60 * 60 * 1000);
+
+        onAddEvent({
+            title: task.description,
+            startTime: startTime.toISOString(),
+            endTime: endTime.toISOString(),
+            description: `From email: "${email?.subject}"`
+        });
+    } else {
+        // Handle other task types like REMINDER or DEADLINE, or show a toast
+        onAction(AIAction.NO_ACTION, { toast: `Reminder for "${task.description}" set!` });
+    }
   };
 
   const SnoozeMenuItem: React.FC<{label: string, onClick: () => void}> = ({ label, onClick }) => (

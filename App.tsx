@@ -1,6 +1,6 @@
 
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
-import { Email, EmailStatus, AIAction, ChatMessage, MessageAuthor, MailboxView, EmailCategory, AISearchCriteria, Theme, Account, AgentConfig } from './types';
+import { Email, EmailStatus, AIAction, ChatMessage, MessageAuthor, MailboxView, EmailCategory, AISearchCriteria, Theme, Account, AgentConfig, CalendarEvent } from './types';
 import { MOCK_EMAILS, createNewMockEmail } from './constants';
 import MailboxPanel from './components/MailboxPanel';
 import EmailDetail from './components/EmailDetail';
@@ -8,6 +8,7 @@ import ChatAssistant from './components/ChatAssistant';
 import ComposeModal from './components/ComposeModal';
 import SettingsModal from './components/SettingsModal';
 import Resizer from './components/Resizer';
+import CalendarView from './components/CalendarView';
 import { processEmailCommand, generateQuickReplies, processSearchQuery, generateSuggestedActions, generateSummary, detectTasksInEmail } from './services/geminiService';
 
 const App: React.FC = () => {
@@ -21,6 +22,11 @@ const App: React.FC = () => {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [undoAction, setUndoAction] = useState<{ emailIds: number[], previousStatus: EmailStatus } | null>(null);
   
+  const [events, setEvents] = useState<CalendarEvent[]>([
+      { id: '1', title: 'Project Phoenix Kickoff', startTime: '2025-09-18T14:00:00Z', endTime: '2025-09-18T15:00:00Z' },
+      { id: '2', title: 'Design Review', startTime: '2025-09-19T10:00:00Z', endTime: '2025-09-19T11:30:00Z' },
+  ]);
+
   const [messages, setMessages] = useState<ChatMessage[]>([
     { author: MessageAuthor.AI, text: "Hello! I'm your Email Agent. How can I help you today?" }
   ]);
@@ -306,6 +312,15 @@ const App: React.FC = () => {
   }, []);
 
   const selectedEmail = useMemo(() => emails.find(e => e.id === selectedEmailId) || null, [emails, selectedEmailId]);
+
+  const addEvent = (event: Omit<CalendarEvent, 'id'>) => {
+    const newEvent: CalendarEvent = {
+        ...event,
+        id: `evt-${Date.now()}`,
+    };
+    setEvents(prevEvents => [...prevEvents, newEvent]);
+    showToast(`Event "${newEvent.title}" added to calendar!`);
+  };
 
   const handleSetView = (view: MailboxView) => {
     if (view === currentView) return;
@@ -657,6 +672,48 @@ const App: React.FC = () => {
       />
 
       <div ref={containerRef} className="flex-grow w-full h-full flex flex-col md:flex-row p-4 gap-4 md:gap-0">
+        {currentView === 'CALENDAR' ? (
+            <>
+                <div
+                    className="bg-[var(--bg-panel)] border border-[var(--border-glow)] rounded-2xl overflow-hidden flex flex-col backdrop-blur-xl animate-slow-fade-in md:h-auto"
+                    style={{ flexBasis: '25%', minWidth: '240px' }}
+                >
+                    <MailboxPanel
+                        emails={emails}
+                        visibleEmails={visibleEmails}
+                        currentView={currentView}
+                        isViewTransitioning={isViewTransitioning}
+                        onSetView={handleSetView}
+                        onCompose={() => { setComposeInitialState({}); setIsComposeOpen(true); }}
+                        onOpenSettings={() => setIsSettingsOpen(true)}
+                        onSelectEmail={handleSelectEmail}
+                        selectedEmailId={selectedEmailId}
+                        highlightedEmailId={highlightedEmailId}
+                        onAiSearch={handleAiSearch}
+                        isSearching={isSearching}
+                        aiCriteria={aiSearchCriteria}
+                        searchQuery={searchQuery}
+                        onClearSearch={() => { setAiSearchCriteria(null); setSearchQuery(''); }}
+                        activeCategory={activeCategory}
+                        onSetCategory={setActiveCategory}
+                        selectedEmailIds={selectedEmailIds}
+                        onToggleSelectId={handleToggleSelectId}
+                        onToggleSelectAll={handleToggleSelectAll}
+                        onAction={(action, params) => executeAction({ action, parameters: params })}
+                    />
+                </div>
+                <div className="hidden md:flex group flex-shrink-0">
+                    <Resizer onMouseDown={(e) => handleMouseDown(0, e)} />
+                </div>
+                <div
+                    className="bg-[var(--bg-panel)] border border-[var(--border-glow)] rounded-2xl overflow-hidden flex flex-col backdrop-blur-xl animate-slow-fade-in md:h-auto"
+                    style={{ flexBasis: '75%' }}
+                >
+                    <CalendarView events={events} />
+                </div>
+            </>
+        ) : (
+        <>
         <div
             ref={panelRefs[0]}
             className="bg-[var(--bg-panel)] border border-[var(--border-glow)] rounded-2xl overflow-hidden flex flex-col backdrop-blur-xl animate-slow-fade-in md:h-auto" 
@@ -714,6 +771,7 @@ const App: React.FC = () => {
             onAction={(action, params) => executeAction({action, parameters: params})}
             onCompose={(initialState) => { setComposeInitialState(initialState); setIsComposeOpen(true); }}
             onSummarize={handleSummarize}
+            onAddEvent={addEvent}
             enableSummarization={agentConfig.enableSummarization}
             enableQuickReplies={agentConfig.enableQuickReplies}
             selectedEmailIds={selectedEmailIds}
@@ -742,6 +800,8 @@ const App: React.FC = () => {
             suggestedActions={suggestedActions}
            />
         </div>
+        </>
+        )}
       </div>
     </div>
   );

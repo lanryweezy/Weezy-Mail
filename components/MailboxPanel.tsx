@@ -148,6 +148,7 @@ const MailboxPanel: React.FC<MailboxPanelProps> = (props) => {
         </div>
         <ul className="space-y-1">
           <NavItem icon="inbox" label="Inbox" count={primaryUnreadCount} isActive={currentView === 'INBOX'} onClick={() => onSetView('INBOX')} />
+          <NavItem icon="calendar" label="Calendar" isActive={currentView === 'CALENDAR'} onClick={() => onSetView('CALENDAR')} />
           <NavItem icon="draft" label="Drafts" count={draftsCount} isActive={currentView === 'DRAFTS'} onClick={() => onSetView('DRAFTS')} />
           <NavItem icon="paper-airplane" label="Sent" isActive={currentView === 'SENT'} onClick={() => onSetView('SENT')} />
           <NavItem icon="clock" label="Snoozed" count={snoozedCount} isActive={currentView === 'SNOOZED'} onClick={() => onSetView('SNOOZED')} />

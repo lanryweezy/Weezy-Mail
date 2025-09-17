@@ -9,8 +9,16 @@ export enum EmailStatus {
   SNOOZED = 'SNOOZED',
 }
 
-export type MailboxView = 'INBOX' | 'SENT' | 'DRAFTS' | 'IMPORTANT' | 'TRASH' | 'SNOOZED';
+export type MailboxView = 'INBOX' | 'SENT' | 'DRAFTS' | 'IMPORTANT' | 'TRASH' | 'SNOOZED' | 'CALENDAR';
 export type EmailCategory = 'PRIMARY' | 'PROMOTIONS' | 'UPDATES';
+
+export interface CalendarEvent {
+  id: string;
+  title: string;
+  startTime: string; // ISO 8601 format
+  endTime: string;   // ISO 8601 format
+  description?: string;
+}
 
 export interface Email {
   id: number;

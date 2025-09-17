@@ -534,22 +534,31 @@ const App: React.FC = () => {
     }
   }, [emails, messages, selectedEmailId, currentView, agentConfig.personality]);
 
-  const handleAiSearch = useCallback(async (query: string) => {
-    if (!query) {
+  const handleAiSearch = useCallback(async (queryOrCriteria: string | AISearchCriteria) => {
+    if (!queryOrCriteria) {
       setAiSearchCriteria(null);
       setSearchQuery('');
       return;
     }
+
     setIsSearching(true);
-    setSearchQuery(query);
+    // For structured search, we can create a descriptive query string for display
+    const displayQuery = typeof queryOrCriteria === 'string' ? queryOrCriteria : 'Advanced Search';
+    setSearchQuery(displayQuery);
+
     try {
-        const criteria = await processSearchQuery(query);
+        let criteria: AISearchCriteria;
+        if (typeof queryOrCriteria === 'string') {
+            criteria = await processSearchQuery(queryOrCriteria);
+        } else {
+            criteria = queryOrCriteria;
+        }
         setAiSearchCriteria(criteria);
         setSelectedEmailIds(new Set());
     } catch (error) {
         console.error("AI Search Error:", error);
         showToast("AI search failed. Using basic search.");
-        setAiSearchCriteria(null); // Fallback to basic search
+        setAiSearchCriteria(null);
     } finally {
         setIsSearching(false);
     }
@@ -607,7 +616,7 @@ const App: React.FC = () => {
     // 3. Filter by AI Search Criteria
     if (aiSearchCriteria) {
         return filteredEmails.filter(e => {
-            const { sender, subject, keyword, isUnread } = aiSearchCriteria;
+            const { sender, subject, keyword, isUnread, hasAttachment } = aiSearchCriteria;
             const lowercasedSender = sender?.toLowerCase();
             const lowercasedSubject = subject?.toLowerCase();
             const lowercasedKeyword = keyword?.toLowerCase();
@@ -615,7 +624,8 @@ const App: React.FC = () => {
             return (!lowercasedSender || e.sender.toLowerCase().includes(lowercasedSender)) &&
                    (!lowercasedSubject || e.subject.toLowerCase().includes(lowercasedSubject)) &&
                    (!lowercasedKeyword || e.body.toLowerCase().includes(lowercasedKeyword)) &&
-                   (isUnread === undefined || (isUnread && e.status === EmailStatus.UNREAD));
+                   (isUnread === undefined || (isUnread && e.status === EmailStatus.UNREAD)) &&
+                   (hasAttachment === undefined || (hasAttachment && e.attachments && e.attachments.length > 0));
         });
     }
 

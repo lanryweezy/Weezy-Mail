@@ -112,6 +112,7 @@ export interface AISearchCriteria {
     subject?: string;
     keyword?: string; // for body
     isUnread?: boolean;
+    hasAttachment?: boolean;
 }
 
 // --- App Settings ---

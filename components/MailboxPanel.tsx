@@ -49,21 +49,29 @@ const CategoryTab: React.FC<{label: string, isActive: boolean, onClick: () => vo
 );
 
 const AiSearchPill: React.FC<{ criteria: AISearchCriteria; onClear: () => void }> = ({ criteria, onClear }) => {
-    const description = Object.entries(criteria)
+    const descriptions = Object.entries(criteria)
         .map(([key, value]) => {
-            if (key === 'isUnread' && value) return 'unread';
-            if (value) return `from '${value}'`;
-            return '';
+            if (!value) return null;
+            switch(key) {
+                case 'sender': return `from: ${value}`;
+                case 'subject': return `subject: ${value}`;
+                case 'keyword': return `keyword: ${value}`;
+                case 'isUnread': return 'is: unread';
+                case 'hasAttachment': return 'has: attachment';
+                default: return null;
+            }
         })
-        .filter(Boolean)
-        .join(' and ');
+        .filter(Boolean);
 
-    if (!description) return null;
+    if (descriptions.length === 0) return null;
+
+    const isAiSearch = !!criteria.keyword && descriptions.length === 1;
+    const label = isAiSearch ? 'AI Search' : 'Filters';
 
     return (
         <div className="flex items-center gap-2 bg-blue-500/20 text-blue-300 text-xs px-3 py-1.5 rounded-full animate-slow-fade-in">
-            <Icon name="sparkles" className="w-4 h-4" />
-            <span className="font-medium">AI Search: {description}</span>
+            <Icon name={isAiSearch ? 'sparkles' : 'search'} className="w-4 h-4" />
+            <span className="font-medium">{label}: {descriptions.join(', ')}</span>
             <button onClick={onClear} className="text-blue-300 hover:text-white">
                 <Icon name="close" className="w-4 h-4"/>
             </button>

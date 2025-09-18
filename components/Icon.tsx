@@ -2,7 +2,7 @@
 import React from 'react';
 
 interface IconProps {
-  name: 'paper-airplane' | 'archive' | 'inbox' | 'star' | 'sparkles' | 'user' | 'trash' | 'reply' | 'forward' | 'pencil' | 'paper-clip' | 'draft' | 'clock' | 'search' | 'document-text' | 'settings' | 'close' | 'reply-all' | 'quick-actions' | 'calendar';
+  name: 'paper-airplane' | 'archive' | 'inbox' | 'star' | 'sparkles' | 'user' | 'trash' | 'reply' | 'forward' | 'pencil' | 'paper-clip' | 'draft' | 'clock' | 'search' | 'document-text' | 'settings' | 'close';
   className?: string;
 }
 
@@ -93,22 +93,6 @@ const Icon: React.FC<IconProps> = ({ name, className = 'w-6 h-6' }) => {
         <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
         </svg>
-    ),
-    'reply-all': (
-      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M9 15L3 9m0 0l6-6M3 9h12a6 6 0 010 12h-3" />
-        <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 15l6-6m0 0l-6-6m6 6H9.5" />
-      </svg>
-    ),
-    'quick-actions': (
-      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5M5.625 4.5h12.75a1.125 1.125 0 010 2.25H5.625a1.125 1.125 0 010-2.25z" />
-      </svg>
-    ),
-    'calendar': (
-      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className={className}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0h18M12 12.75h.008v.008H12v-.008z" />
-      </svg>
     )
   };
 

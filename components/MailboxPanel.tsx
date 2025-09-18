@@ -49,29 +49,21 @@ const CategoryTab: React.FC<{label: string, isActive: boolean, onClick: () => vo
 );
 
 const AiSearchPill: React.FC<{ criteria: AISearchCriteria; onClear: () => void }> = ({ criteria, onClear }) => {
-    const descriptions = Object.entries(criteria)
+    const description = Object.entries(criteria)
         .map(([key, value]) => {
-            if (!value) return null;
-            switch(key) {
-                case 'sender': return `from: ${value}`;
-                case 'subject': return `subject: ${value}`;
-                case 'keyword': return `keyword: ${value}`;
-                case 'isUnread': return 'is: unread';
-                case 'hasAttachment': return 'has: attachment';
-                default: return null;
-            }
+            if (key === 'isUnread' && value) return 'unread';
+            if (value) return `from '${value}'`;
+            return '';
         })
-        .filter(Boolean);
+        .filter(Boolean)
+        .join(' and ');
 
-    if (descriptions.length === 0) return null;
-
-    const isAiSearch = !!criteria.keyword && descriptions.length === 1;
-    const label = isAiSearch ? 'AI Search' : 'Filters';
+    if (!description) return null;
 
     return (
         <div className="flex items-center gap-2 bg-blue-500/20 text-blue-300 text-xs px-3 py-1.5 rounded-full animate-slow-fade-in">
-            <Icon name={isAiSearch ? 'sparkles' : 'search'} className="w-4 h-4" />
-            <span className="font-medium">{label}: {descriptions.join(', ')}</span>
+            <Icon name="sparkles" className="w-4 h-4" />
+            <span className="font-medium">AI Search: {description}</span>
             <button onClick={onClear} className="text-blue-300 hover:text-white">
                 <Icon name="close" className="w-4 h-4"/>
             </button>
@@ -82,19 +74,15 @@ const AiSearchPill: React.FC<{ criteria: AISearchCriteria; onClear: () => void }
 
 // --- Main MailboxPanel Component ---
 
-import { AIAction } from '../types';
-
 interface MailboxPanelProps {
   emails: Email[]; // All emails for counts
   visibleEmails: Email[]; // Filtered emails to display
   currentView: MailboxView;
-  isViewTransitioning: boolean;
   onSetView: (view: MailboxView) => void;
   onCompose: () => void;
   onOpenSettings: () => void;
   onSelectEmail: (email: Email) => void;
   selectedEmailId?: number | null;
-  highlightedEmailId?: number | null;
   onAiSearch: (query: string) => void;
   isSearching: boolean;
   aiCriteria: AISearchCriteria | null;
@@ -105,15 +93,14 @@ interface MailboxPanelProps {
   selectedEmailIds: Set<number>;
   onToggleSelectId: (id: number) => void;
   onToggleSelectAll: () => void;
-  onAction: (action: AIAction, params: any) => void;
 }
 
 const MailboxPanel: React.FC<MailboxPanelProps> = (props) => {
     const {
-        emails, visibleEmails, currentView, isViewTransitioning, onSetView, onCompose, onOpenSettings,
-        onSelectEmail, selectedEmailId, highlightedEmailId, onAiSearch, isSearching, aiCriteria,
+        emails, visibleEmails, currentView, onSetView, onCompose, onOpenSettings,
+        onSelectEmail, selectedEmailId, onAiSearch, isSearching, aiCriteria,
         searchQuery, onClearSearch, activeCategory, onSetCategory,
-        selectedEmailIds, onToggleSelectId, onToggleSelectAll, onAction,
+        selectedEmailIds, onToggleSelectId, onToggleSelectAll,
     } = props;
 
   const primaryUnreadCount = emails.filter(e => e.status === EmailStatus.UNREAD && e.category === 'PRIMARY').length;
@@ -148,7 +135,7 @@ const MailboxPanel: React.FC<MailboxPanelProps> = (props) => {
         <div className="px-2 mb-4">
           <button 
             onClick={onCompose}
-            className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-blue-600 to-cyan-500 text-white font-bold py-3 px-4 rounded-lg hover:shadow-lg hover:shadow-cyan-500/20 transition-all duration-300 transform hover:-translate-y-0.5 active:scale-95"
+            className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-blue-600 to-cyan-500 text-white font-bold py-3 px-4 rounded-lg hover:shadow-lg hover:shadow-cyan-500/20 transition-all duration-300 transform hover:-translate-y-0.5"
           >
             <Icon name="pencil" className="w-5 h-5" />
             <span>Compose</span>
@@ -156,7 +143,6 @@ const MailboxPanel: React.FC<MailboxPanelProps> = (props) => {
         </div>
         <ul className="space-y-1">
           <NavItem icon="inbox" label="Inbox" count={primaryUnreadCount} isActive={currentView === 'INBOX'} onClick={() => onSetView('INBOX')} />
-          <NavItem icon="calendar" label="Calendar" isActive={currentView === 'CALENDAR'} onClick={() => onSetView('CALENDAR')} />
           <NavItem icon="draft" label="Drafts" count={draftsCount} isActive={currentView === 'DRAFTS'} onClick={() => onSetView('DRAFTS')} />
           <NavItem icon="paper-airplane" label="Sent" isActive={currentView === 'SENT'} onClick={() => onSetView('SENT')} />
           <NavItem icon="clock" label="Snoozed" count={snoozedCount} isActive={currentView === 'SNOOZED'} onClick={() => onSetView('SNOOZED')} />
@@ -206,17 +192,15 @@ const MailboxPanel: React.FC<MailboxPanelProps> = (props) => {
                     className="w-4 h-4 rounded bg-white/10 border-slate-500 text-[var(--accent-cyan)] focus:ring-0 focus:ring-offset-0 cursor-pointer"
                 />
             </div>
-            <ul className={`p-1 space-y-1 transition-opacity duration-200 ${isViewTransitioning ? 'opacity-0' : 'opacity-100'}`}>
+            <ul className="p-1 space-y-1">
                 {visibleEmails.map(email => (
                 <EmailListItem
                     key={email.id}
                     email={email}
                     isSelected={email.id === selectedEmailId}
-                    isHighlighted={email.id === highlightedEmailId}
                     onSelect={() => onSelectEmail(email)}
                     isChecked={selectedEmailIds.has(email.id)}
                     onToggleSelect={onToggleSelectId}
-                    onAction={onAction}
                 />
                 ))}
             </ul>

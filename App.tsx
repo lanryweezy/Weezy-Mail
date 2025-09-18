@@ -1,15 +1,11 @@
 
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
-import { Email, EmailStatus, AIAction, ChatMessage, MessageAuthor, MailboxView, EmailCategory, AISearchCriteria, Theme, Account, AgentConfig, CalendarEvent } from './types';
-import { MOCK_EMAILS, createNewMockEmail } from './constants';
 import MailboxPanel from './components/MailboxPanel';
 import EmailDetail from './components/EmailDetail';
 import ChatAssistant from './components/ChatAssistant';
 import ComposeModal from './components/ComposeModal';
 import SettingsModal from './components/SettingsModal';
 import Resizer from './components/Resizer';
-import CalendarView from './components/CalendarView';
-import { processEmailCommand, generateQuickReplies, processSearchQuery, generateSuggestedActions, generateSummary, detectTasksInEmail } from './services/geminiService';
 
 const App: React.FC = () => {
   const [emails, setEmails] = useState<Email[]>(MOCK_EMAILS);
@@ -21,6 +17,9 @@ const App: React.FC = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [undoAction, setUndoAction] = useState<{ emailIds: number[], previousStatus: EmailStatus } | null>(null);
+  const [actionLog, setActionLog] = useState<ActionLogEntry[]>([]);
+  const [suggestedRule, setSuggestedRule] = useState<Omit<TriageRule, 'id'> | null>(null);
+  const [activeRules, setActiveRules] = useState<TriageRule[]>([]);
   
   const [events, setEvents] = useState<CalendarEvent[]>([
       { id: '1', title: 'Project Phoenix Kickoff', startTime: '2025-09-18T14:00:00Z', endTime: '2025-09-18T15:00:00Z' },
@@ -47,7 +46,6 @@ const App: React.FC = () => {
       enableQuickReplies: true,
       enableSummarization: true
   });
-  const [suggestedActions, setSuggestedActions] = useState<string[]>([]);
   
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
@@ -60,205 +58,6 @@ const App: React.FC = () => {
       setSuggestedActions([]);
     }
   }, [selectedEmail]);
-
-  // Effect to detect tasks in the selected email
-  useEffect(() => {
-    if (selectedEmail && selectedEmail.detectedTasks === undefined) {
-      detectTasksInEmail(selectedEmail).then(tasks => {
-        setEmails(currentEmails =>
-          currentEmails.map(e => {
-            if (e.id === selectedEmail.id) {
-              // Set detectedTasks to the result (even if it's an empty array)
-              // to prevent re-running the detection.
-              return { ...e, detectedTasks: tasks };
-            }
-            return e;
-          })
-        );
-      }).catch(error => {
-          console.error(`Failed to detect tasks for email ${selectedEmail.id}:`, error);
-          // Set to an empty array on error to prevent retries
-          setEmails(currentEmails =>
-            currentEmails.map(e =>
-              e.id === selectedEmail.id ? { ...e, detectedTasks: [] } : e
-            )
-          );
-      });
-    }
-  }, [selectedEmail]);
-
-  // Effect to generate summaries for emails that don't have one
-  useEffect(() => {
-    const processNextEmail = async () => {
-      const emailToProcess = emails.find(e => !e.summary && e.body.length > 100);
-      if (!emailToProcess) {
-        return;
-      }
-
-      try {
-        const summary = await generateSummary(emailToProcess);
-        if (summary) {
-          setEmails(currentEmails =>
-            currentEmails.map(e =>
-              e.id === emailToProcess.id ? { ...e, summary } : e
-            )
-          );
-        }
-      } catch (error) {
-        console.error(`Failed to generate summary for email ${emailToProcess.id}:`, error);
-        // To prevent retrying a failed summary, we can set it to a special value or just leave it.
-        // For now, we'll just log the error and let it be retried next time.
-      }
-    };
-
-    // This timeout ensures we don't process a huge batch of emails all at once on initial load
-    const timeoutId = setTimeout(processNextEmail, 1000);
-    return () => clearTimeout(timeoutId);
-
-  }, [emails]);
-
-
-  // --- Keyboard Shortcut Handler ---
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      // Ignore shortcuts if user is typing in an input
-      const target = event.target as HTMLElement;
-      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
-        return;
-      }
-      // Shortcut logic
-      switch (event.key) {
-        case 'j': { // Move down
-          event.preventDefault();
-          const currentIdx = visibleEmails.findIndex(e => e.id === (highlightedEmailId ?? selectedEmailId));
-          const nextIdx = Math.min(currentIdx + 1, visibleEmails.length - 1);
-          if (nextIdx !== currentIdx) {
-            setHighlightedEmailId(visibleEmails[nextIdx].id);
-          }
-          break;
-        }
-        case 'k': { // Move up
-          event.preventDefault();
-          const currentIdx = visibleEmails.findIndex(e => e.id === (highlightedEmailId ?? selectedEmailId));
-          const nextIdx = Math.max(currentIdx - 1, 0);
-           if (nextIdx !== currentIdx) {
-            setHighlightedEmailId(visibleEmails[nextIdx].id);
-          }
-          break;
-        }
-        case 'o':
-        case 'Enter': {
-            event.preventDefault();
-            const emailToSelect = visibleEmails.find(e => e.id === highlightedEmailId);
-            if (emailToSelect) {
-                handleSelectEmail(emailToSelect);
-            }
-            break;
-        }
-        case 'c': {
-            event.preventDefault();
-            setComposeInitialState({});
-            setIsComposeOpen(true);
-            break;
-        }
-        case '#': {
-            if (selectedEmail) {
-                event.preventDefault();
-                executeAction({ action: AIAction.DELETE_EMAIL, parameters: { emailId: selectedEmail.id } });
-            }
-            break;
-        }
-        case 'e': {
-            if (selectedEmail) {
-                event.preventDefault();
-                executeAction({ action: AIAction.ARCHIVE_EMAIL, parameters: { emailId: selectedEmail.id } });
-            }
-            break;
-        }
-        case 'r': {
-            if (selectedEmail) {
-                event.preventDefault();
-                setComposeInitialState({
-                    recipient: selectedEmail.sender_email,
-                    subject: `Re: ${selectedEmail.subject}`,
-                    body: `\n\n---- On ${new Date(selectedEmail.timestamp).toLocaleString()}, ${selectedEmail.sender} wrote: ----\n>${selectedEmail.body.replace(/\n/g, '\n>')}`
-                });
-                setIsComposeOpen(true);
-            }
-            break;
-        }
-      }
-    };
-
-    document.addEventListener('keydown', handleKeyDown);
-    return () => {
-      document.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [visibleEmails, highlightedEmailId, selectedEmailId]);
-
-
-  // --- Resizable panels state and logic ---
-  const [panelWidths, setPanelWidths] = useState([25, 42, 33]);
-  const isResizingRef = useRef<number | null>(null);
-
-  const containerRef = useRef<HTMLDivElement>(null);
-  const panelRefs = [useRef<HTMLDivElement>(null), useRef<HTMLDivElement>(null), useRef<HTMLDivElement>(null)];
-  const MIN_PANEL_WIDTH_PX = 240;
-
-  const handleMouseDown = useCallback((index: number, e: React.MouseEvent) => {
-    e.preventDefault();
-    isResizingRef.current = index;
-    document.body.style.cursor = 'col-resize';
-    document.body.style.userSelect = 'none';
-
-    const handleMouseMove = (event: MouseEvent) => {
-        if (isResizingRef.current === null || !containerRef.current) return;
-
-        const leftPanel = panelRefs[isResizingRef.current]?.current;
-        const rightPanel = panelRefs[isResizingRef.current + 1]?.current;
-
-        if (!leftPanel || !rightPanel) return;
-
-        const containerWidth = containerRef.current.offsetWidth;
-        const leftPanelRect = leftPanel.getBoundingClientRect();
-        const rightPanelRect = rightPanel.getBoundingClientRect();
-
-        const combinedWidth = leftPanelRect.width + rightPanelRect.width;
-
-        const newLeftWidth = event.clientX - leftPanelRect.left;
-
-        if (newLeftWidth > MIN_PANEL_WIDTH_PX && (combinedWidth - newLeftWidth) > MIN_PANEL_WIDTH_PX) {
-            const newLeftPercent = (newLeftWidth / containerWidth) * 100;
-            const newRightPercent = ((combinedWidth - newLeftWidth) / containerWidth) * 100;
-            leftPanel.style.flexBasis = `${newLeftPercent}%`;
-            rightPanel.style.flexBasis = `${newRightPercent}%`;
-        }
-    };
-
-    const handleMouseUp = () => {
-        isResizingRef.current = null;
-        document.body.style.cursor = 'auto';
-        document.body.style.userSelect = 'auto';
-
-        // Update React state with the final widths from the DOM
-        const newWidths = panelRefs.map(ref => {
-            if (ref.current) {
-                return (ref.current.offsetWidth / containerRef.current!.offsetWidth) * 100;
-            }
-            return 0;
-        });
-
-        // Only update state if the widths are valid
-        if (newWidths.every(w => w > 0)) {
-            setPanelWidths(newWidths);
-        }
-
-        window.removeEventListener('mousemove', handleMouseMove);
-        window.removeEventListener('mouseup', handleMouseUp);
-    };
-
-    window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mouseup', handleMouseUp);
 
   }, [panelRefs]);
 
@@ -503,6 +302,19 @@ const App: React.FC = () => {
     if (isBulkAction) {
         setSelectedEmailId(null);
         setSelectedEmailIds(new Set());
+    } else if (action === AIAction.DELETE_EMAIL || action === AIAction.ARCHIVE_EMAIL) {
+        // Log the action for triage learning
+        const email = emails.find(e => e.id === singleTargetId);
+        if (email) {
+            const triageAction: TriageAction = action === AIAction.DELETE_EMAIL ? 'DELETE' : 'ARCHIVE';
+            const logEntry: ActionLogEntry = {
+                action: triageAction,
+                emailId: email.id,
+                sender: email.sender,
+                timestamp: Date.now(),
+            };
+            setActionLog(prevLog => [...prevLog, logEntry]);
+        }
     }
   }
 
@@ -653,9 +465,92 @@ const App: React.FC = () => {
     }
   };
 
+  // --- Agentic Feature Handlers ---
+  const handleUnsubscribe = (subscriptionIds: string[]) => {
+    setSubscriptions(prev => prev.filter(sub => !subscriptionIds.includes(sub.id)));
+    setToastMessage(`Unsubscribed from ${subscriptionIds.length} newsletter(s)`);
+    setTimeout(() => setToastMessage(null), 3000);
+  };
+
+  const handleToggleDigestMode = (subscriptionId: string) => {
+    setSubscriptions(prev => prev.map(sub => 
+      sub.id === subscriptionId ? { ...sub, isActive: !sub.isActive } : sub
+    ));
+  };
+
+  const handleConvertFile = (attachmentId: string, format: string) => {
+    console.log(`Converting ${attachmentId} to ${format}`);
+    setToastMessage(`Converting file to ${format.toUpperCase()}`);
+    setTimeout(() => setToastMessage(null), 3000);
+  };
+
+  const handleExtractText = (attachmentId: string) => {
+    const attachment = smartAttachments.find(a => a.id === attachmentId);
+    if (attachment) {
+      console.log(`Extracting text from ${attachment.name}`);
+      setToastMessage(`Extracting text from ${attachment.name}`);
+      setTimeout(() => setToastMessage(null), 3000);
+    }
+  };
+
+  const handleSummarizeAndSend = (attachmentId: string, recipient: string) => {
+    const attachment = smartAttachments.find(a => a.id === attachmentId);
+    if (attachment) {
+      console.log(`Summarizing ${attachment.name} and sending to ${recipient}`);
+      setToastMessage(`Summarizing and sending ${attachment.name}`);
+      setTimeout(() => setToastMessage(null), 3000);
+    }
+  };
+
+  const handleCreateTask = (attachmentId: string) => {
+    const attachment = smartAttachments.find(a => a.id === attachmentId);
+    if (attachment) {
+      console.log(`Creating task for ${attachment.name}`);
+      setToastMessage(`Task created for ${attachment.name}`);
+      setTimeout(() => setToastMessage(null), 3000);
+    }
+  };
+
+  const handleExecuteQuickAction = (actionId: string) => {
+    const action = quickActions.find(a => a.id === actionId);
+    if (action) {
+      action.action();
+      setToastMessage(`Executed: ${action.label}`);
+      setTimeout(() => setToastMessage(null), 3000);
+    }
+  };
+
+  const handleDismissInsight = (insightId: string) => {
+    setAgenticInsights(prev => prev.filter(insight => insight.title !== insightId));
+  };
+
+  const handleSendChatMessage = (message: string) => {
+    const newMessage: ChatMessage = {
+      author: MessageAuthor.USER,
+      text: message
+    };
+    setMessages(prev => [...prev, newMessage]);
+    
+    // Simulate AI response
+    setTimeout(() => {
+      const aiResponse: ChatMessage = {
+        author: MessageAuthor.AI,
+        text: `I'll help you with: "${message}". Let me process that for you.`
+      };
+      setMessages(prev => [...prev, aiResponse]);
+    }, 1000);
+  };
+
 
   return (
     <div className="h-screen w-screen text-[var(--text-primary)] font-sans overflow-hidden flex flex-col">
+      {suggestedRule && (
+        <RuleSuggestionToast
+            rule={suggestedRule}
+            onAccept={handleAcceptRule}
+            onDecline={handleDeclineRule}
+        />
+      )}
       {toastMessage && (
         <div className="absolute top-5 right-5 bg-[var(--bg-panel-solid)] border border-[var(--border-glow)] text-white py-2 px-5 rounded-lg shadow-2xl z-50 flex items-center gap-4 backdrop-blur-xl animate-slow-fade-in">
           <span>{toastMessage}</span>
@@ -775,17 +670,6 @@ const App: React.FC = () => {
                 flexShrink: 0,
             }}
         >
-          <EmailDetail 
-            key={selectedEmailId}
-            email={selectedEmail}
-            onAction={(action, params) => executeAction({action, parameters: params})}
-            onCompose={(initialState) => { setComposeInitialState(initialState); setIsComposeOpen(true); }}
-            onSummarize={handleSummarize}
-            onAddEvent={addEvent}
-            enableSummarization={agentConfig.enableSummarization}
-            enableQuickReplies={agentConfig.enableQuickReplies}
-            selectedEmailIds={selectedEmailIds}
-          />
         </div>
 
         <div className="hidden md:flex group flex-shrink-0">
@@ -803,12 +687,6 @@ const App: React.FC = () => {
                 flexShrink: 0,
             }}
         >
-           <ChatAssistant 
-            messages={messages}
-            onSendMessage={handleUserMessage} 
-            isProcessing={isProcessing}
-            suggestedActions={suggestedActions}
-           />
         </div>
         </>
         )}

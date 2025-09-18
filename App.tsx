@@ -1,13 +1,11 @@
 
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
-
 import MailboxPanel from './components/MailboxPanel';
 import EmailDetail from './components/EmailDetail';
 import ChatAssistant from './components/ChatAssistant';
 import ComposeModal from './components/ComposeModal';
 import SettingsModal from './components/SettingsModal';
 import Resizer from './components/Resizer';
-
 
 const App: React.FC = () => {
   const [emails, setEmails] = useState<Email[]>(MOCK_EMAILS);
@@ -48,7 +46,6 @@ const App: React.FC = () => {
       enableQuickReplies: true,
       enableSummarization: true
   });
-
   
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
@@ -61,238 +58,6 @@ const App: React.FC = () => {
       setSuggestedActions([]);
     }
   }, [selectedEmail]);
-
-  // Effect to detect tasks in the selected email
-  useEffect(() => {
-    if (selectedEmail && selectedEmail.detectedTasks === undefined) {
-      detectTasksInEmail(selectedEmail).then(tasks => {
-        setEmails(currentEmails =>
-          currentEmails.map(e => {
-            if (e.id === selectedEmail.id) {
-              // Set detectedTasks to the result (even if it's an empty array)
-              // to prevent re-running the detection.
-              return { ...e, detectedTasks: tasks };
-            }
-            return e;
-          })
-        );
-      }).catch(error => {
-          console.error(`Failed to detect tasks for email ${selectedEmail.id}:`, error);
-          // Set to an empty array on error to prevent retries
-          setEmails(currentEmails =>
-            currentEmails.map(e =>
-              e.id === selectedEmail.id ? { ...e, detectedTasks: [] } : e
-            )
-          );
-      });
-    }
-  }, [selectedEmail]);
-
-  // Effect to generate summaries for emails that don't have one
-  useEffect(() => {
-    const processNextEmail = async () => {
-      const emailToProcess = emails.find(e => !e.summary && e.body.length > 100);
-      if (!emailToProcess) {
-        return;
-      }
-
-      try {
-        const summary = await generateSummary(emailToProcess);
-        if (summary) {
-          setEmails(currentEmails =>
-            currentEmails.map(e =>
-              e.id === emailToProcess.id ? { ...e, summary } : e
-            )
-          );
-        }
-      } catch (error) {
-        console.error(`Failed to generate summary for email ${emailToProcess.id}:`, error);
-        // To prevent retrying a failed summary, we can set it to a special value or just leave it.
-        // For now, we'll just log the error and let it be retried next time.
-      }
-    };
-
-    // This timeout ensures we don't process a huge batch of emails all at once on initial load
-    const timeoutId = setTimeout(processNextEmail, 1000);
-    return () => clearTimeout(timeoutId);
-
-  }, [emails]);
-
-
-  // --- Rule Detection Effect ---
-  useEffect(() => {
-    if (suggestedRule) return; // Don't suggest a new rule if one is already showing
-
-    const potentialRule = detectRuleFromLog(actionLog, activeRules);
-    if (potentialRule) {
-        setSuggestedRule(potentialRule);
-    }
-  }, [actionLog, activeRules, suggestedRule]);
-
-  // --- Auto-Triage Effect ---
-  useEffect(() => {
-    if (activeRules.length === 0) return;
-
-    const emailsToTriage = emails.filter(e => e.status === EmailStatus.UNREAD);
-    if (emailsToTriage.length === 0) return;
-
-    let changed = false;
-    emailsToTriage.forEach(email => {
-        const matchingRule = activeRules.find(rule => rule.sender === email.sender);
-        if (matchingRule) {
-            console.log(`Applying rule for ${email.sender}: ${matchingRule.action}`);
-            const action = matchingRule.action === 'DELETE' ? AIAction.DELETE_EMAIL : AIAction.ARCHIVE_EMAIL;
-            executeAction({ action, parameters: { emailId: email.id }});
-            changed = true;
-        }
-    });
-
-    if (changed) {
-        showToast('Auto-triage complete!');
-    }
-  }, [emails, activeRules]);
-
-  // --- Keyboard Shortcut Handler ---
-  useEffect(() => {
-    const handleKeyDown = (event: KeyboardEvent) => {
-      // Ignore shortcuts if user is typing in an input
-      const target = event.target as HTMLElement;
-      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
-        return;
-      }
-      // Shortcut logic
-      switch (event.key) {
-        case 'j': { // Move down
-          event.preventDefault();
-          const currentIdx = visibleEmails.findIndex(e => e.id === (highlightedEmailId ?? selectedEmailId));
-          const nextIdx = Math.min(currentIdx + 1, visibleEmails.length - 1);
-          if (nextIdx !== currentIdx) {
-            setHighlightedEmailId(visibleEmails[nextIdx].id);
-          }
-          break;
-        }
-        case 'k': { // Move up
-          event.preventDefault();
-          const currentIdx = visibleEmails.findIndex(e => e.id === (highlightedEmailId ?? selectedEmailId));
-          const nextIdx = Math.max(currentIdx - 1, 0);
-           if (nextIdx !== currentIdx) {
-            setHighlightedEmailId(visibleEmails[nextIdx].id);
-          }
-          break;
-        }
-        case 'o':
-        case 'Enter': {
-            event.preventDefault();
-            const emailToSelect = visibleEmails.find(e => e.id === highlightedEmailId);
-            if (emailToSelect) {
-                handleSelectEmail(emailToSelect);
-            }
-            break;
-        }
-        case 'c': {
-            event.preventDefault();
-            setComposeInitialState({});
-            setIsComposeOpen(true);
-            break;
-        }
-        case '#': {
-            if (selectedEmail) {
-                event.preventDefault();
-                executeAction({ action: AIAction.DELETE_EMAIL, parameters: { emailId: selectedEmail.id } });
-            }
-            break;
-        }
-        case 'e': {
-            if (selectedEmail) {
-                event.preventDefault();
-                executeAction({ action: AIAction.ARCHIVE_EMAIL, parameters: { emailId: selectedEmail.id } });
-            }
-            break;
-        }
-        case 'r': {
-            if (selectedEmail) {
-                event.preventDefault();
-                setComposeInitialState({
-                    recipient: selectedEmail.sender_email,
-                    subject: `Re: ${selectedEmail.subject}`,
-                    body: `\n\n---- On ${new Date(selectedEmail.timestamp).toLocaleString()}, ${selectedEmail.sender} wrote: ----\n>${selectedEmail.body.replace(/\n/g, '\n>')}`
-                });
-                setIsComposeOpen(true);
-            }
-            break;
-        }
-      }
-    };
-
-    document.addEventListener('keydown', handleKeyDown);
-    return () => {
-      document.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [visibleEmails, highlightedEmailId, selectedEmailId]);
-
-
-  // --- Resizable panels state and logic ---
-  const [panelWidths, setPanelWidths] = useState([25, 42, 33]);
-  const isResizingRef = useRef<number | null>(null);
-
-  const containerRef = useRef<HTMLDivElement>(null);
-  const panelRefs = [useRef<HTMLDivElement>(null), useRef<HTMLDivElement>(null), useRef<HTMLDivElement>(null)];
-  const MIN_PANEL_WIDTH_PX = 240;
-
-  const handleMouseDown = useCallback((index: number, e: React.MouseEvent) => {
-    e.preventDefault();
-    isResizingRef.current = index;
-    document.body.style.cursor = 'col-resize';
-    document.body.style.userSelect = 'none';
-
-    const handleMouseMove = (event: MouseEvent) => {
-        if (isResizingRef.current === null || !containerRef.current) return;
-
-        const leftPanel = panelRefs[isResizingRef.current]?.current;
-        const rightPanel = panelRefs[isResizingRef.current + 1]?.current;
-
-        if (!leftPanel || !rightPanel) return;
-
-        const containerWidth = containerRef.current.offsetWidth;
-        const leftPanelRect = leftPanel.getBoundingClientRect();
-        const rightPanelRect = rightPanel.getBoundingClientRect();
-
-        const combinedWidth = leftPanelRect.width + rightPanelRect.width;
-
-        const newLeftWidth = event.clientX - leftPanelRect.left;
-
-        if (newLeftWidth > MIN_PANEL_WIDTH_PX && (combinedWidth - newLeftWidth) > MIN_PANEL_WIDTH_PX) {
-            const newLeftPercent = (newLeftWidth / containerWidth) * 100;
-            const newRightPercent = ((combinedWidth - newLeftWidth) / containerWidth) * 100;
-            leftPanel.style.flexBasis = `${newLeftPercent}%`;
-            rightPanel.style.flexBasis = `${newRightPercent}%`;
-        }
-    };
-
-    const handleMouseUp = () => {
-        isResizingRef.current = null;
-        document.body.style.cursor = 'auto';
-        document.body.style.userSelect = 'auto';
-
-        // Update React state with the final widths from the DOM
-        const newWidths = panelRefs.map(ref => {
-            if (ref.current) {
-                return (ref.current.offsetWidth / containerRef.current!.offsetWidth) * 100;
-            }
-            return 0;
-        });
-
-        // Only update state if the widths are valid
-        if (newWidths.every(w => w > 0)) {
-            setPanelWidths(newWidths);
-        }
-
-        window.removeEventListener('mousemove', handleMouseMove);
-        window.removeEventListener('mouseup', handleMouseUp);
-    };
-
-    window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mouseup', handleMouseUp);
 
   }, [panelRefs]);
 
@@ -905,7 +670,6 @@ const App: React.FC = () => {
                 flexShrink: 0,
             }}
         >
-
         </div>
 
         <div className="hidden md:flex group flex-shrink-0">

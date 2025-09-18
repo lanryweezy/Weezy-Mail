@@ -72,6 +72,16 @@ export enum AIAction {
     OPEN_COMPOSE_MODAL = 'OPEN_COMPOSE_MODAL',
     CHANGE_VIEW = 'CHANGE_VIEW',
     NO_ACTION = 'NO_ACTION',
+    // New agentic actions
+    UNSUBSCRIBE_BULK = 'UNSUBSCRIBE_BULK',
+    CONVERT_ATTACHMENT = 'CONVERT_ATTACHMENT',
+    EXTRACT_INVOICE_DATA = 'EXTRACT_INVOICE_DATA',
+    SCHEDULE_FOLLOWUP = 'SCHEDULE_FOLLOWUP',
+    CLEAN_INBOX = 'CLEAN_INBOX',
+    GENERATE_SUMMARY_DIGEST = 'GENERATE_SUMMARY_DIGEST',
+    AUTO_CATEGORIZE = 'AUTO_CATEGORIZE',
+    DETECT_ACTION_ITEMS = 'DETECT_ACTION_ITEMS',
+    SMART_PRIORITIZE = 'SMART_PRIORITIZE',
 }
 
 export interface AIActionParameter {
@@ -130,18 +140,4 @@ export interface Account {
     provider: string;
 }
 
-// --- Agentic Triage & Rules ---
-export type TriageAction = 'DELETE' | 'ARCHIVE';
 
-export interface ActionLogEntry {
-    action: TriageAction;
-    emailId: number;
-    sender: string;
-    timestamp: number;
-}
-
-export interface TriageRule {
-    id: string;
-    sender: string;
-    action: TriageAction;
-}

@@ -1,17 +1,13 @@
 
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
-import { Email, EmailStatus, AIAction, ChatMessage, MessageAuthor, MailboxView, EmailCategory, AISearchCriteria, Theme, Account, AgentConfig, CalendarEvent, ActionLogEntry, TriageAction, TriageRule } from './types';
-import { MOCK_EMAILS, createNewMockEmail } from './constants';
+
 import MailboxPanel from './components/MailboxPanel';
 import EmailDetail from './components/EmailDetail';
 import ChatAssistant from './components/ChatAssistant';
 import ComposeModal from './components/ComposeModal';
 import SettingsModal from './components/SettingsModal';
 import Resizer from './components/Resizer';
-import CalendarView from './components/CalendarView';
-import RuleSuggestionToast from './components/RuleSuggestionToast';
-import { processEmailCommand, generateQuickReplies, processSearchQuery, generateSuggestedActions, generateSummary, detectTasksInEmail } from './services/geminiService';
-import { detectRuleFromLog } from './services/triageService';
+
 
 const App: React.FC = () => {
   const [emails, setEmails] = useState<Email[]>(MOCK_EMAILS);
@@ -52,20 +48,7 @@ const App: React.FC = () => {
       enableQuickReplies: true,
       enableSummarization: true
   });
-  const [suggestedActions, setSuggestedActions] = useState<string[]>([]);
 
-  const handleAcceptRule = () => {
-    if (suggestedRule) {
-      const newRule = { ...suggestedRule, id: `rule-${Date.now()}` };
-      setActiveRules(prev => [...prev, newRule]);
-      setSuggestedRule(null);
-      showToast(`Automation rule for ${newRule.sender} created!`);
-    }
-  };
-
-  const handleDeclineRule = () => {
-    setSuggestedRule(null);
-  };
   
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
@@ -717,6 +700,82 @@ const App: React.FC = () => {
     }
   };
 
+  // --- Agentic Feature Handlers ---
+  const handleUnsubscribe = (subscriptionIds: string[]) => {
+    setSubscriptions(prev => prev.filter(sub => !subscriptionIds.includes(sub.id)));
+    setToastMessage(`Unsubscribed from ${subscriptionIds.length} newsletter(s)`);
+    setTimeout(() => setToastMessage(null), 3000);
+  };
+
+  const handleToggleDigestMode = (subscriptionId: string) => {
+    setSubscriptions(prev => prev.map(sub => 
+      sub.id === subscriptionId ? { ...sub, isActive: !sub.isActive } : sub
+    ));
+  };
+
+  const handleConvertFile = (attachmentId: string, format: string) => {
+    console.log(`Converting ${attachmentId} to ${format}`);
+    setToastMessage(`Converting file to ${format.toUpperCase()}`);
+    setTimeout(() => setToastMessage(null), 3000);
+  };
+
+  const handleExtractText = (attachmentId: string) => {
+    const attachment = smartAttachments.find(a => a.id === attachmentId);
+    if (attachment) {
+      console.log(`Extracting text from ${attachment.name}`);
+      setToastMessage(`Extracting text from ${attachment.name}`);
+      setTimeout(() => setToastMessage(null), 3000);
+    }
+  };
+
+  const handleSummarizeAndSend = (attachmentId: string, recipient: string) => {
+    const attachment = smartAttachments.find(a => a.id === attachmentId);
+    if (attachment) {
+      console.log(`Summarizing ${attachment.name} and sending to ${recipient}`);
+      setToastMessage(`Summarizing and sending ${attachment.name}`);
+      setTimeout(() => setToastMessage(null), 3000);
+    }
+  };
+
+  const handleCreateTask = (attachmentId: string) => {
+    const attachment = smartAttachments.find(a => a.id === attachmentId);
+    if (attachment) {
+      console.log(`Creating task for ${attachment.name}`);
+      setToastMessage(`Task created for ${attachment.name}`);
+      setTimeout(() => setToastMessage(null), 3000);
+    }
+  };
+
+  const handleExecuteQuickAction = (actionId: string) => {
+    const action = quickActions.find(a => a.id === actionId);
+    if (action) {
+      action.action();
+      setToastMessage(`Executed: ${action.label}`);
+      setTimeout(() => setToastMessage(null), 3000);
+    }
+  };
+
+  const handleDismissInsight = (insightId: string) => {
+    setAgenticInsights(prev => prev.filter(insight => insight.title !== insightId));
+  };
+
+  const handleSendChatMessage = (message: string) => {
+    const newMessage: ChatMessage = {
+      author: MessageAuthor.USER,
+      text: message
+    };
+    setMessages(prev => [...prev, newMessage]);
+    
+    // Simulate AI response
+    setTimeout(() => {
+      const aiResponse: ChatMessage = {
+        author: MessageAuthor.AI,
+        text: `I'll help you with: "${message}". Let me process that for you.`
+      };
+      setMessages(prev => [...prev, aiResponse]);
+    }, 1000);
+  };
+
 
   return (
     <div className="h-screen w-screen text-[var(--text-primary)] font-sans overflow-hidden flex flex-col">
@@ -846,17 +905,7 @@ const App: React.FC = () => {
                 flexShrink: 0,
             }}
         >
-          <EmailDetail 
-            key={selectedEmailId}
-            email={selectedEmail}
-            onAction={(action, params) => executeAction({action, parameters: params})}
-            onCompose={(initialState) => { setComposeInitialState(initialState); setIsComposeOpen(true); }}
-            onSummarize={handleSummarize}
-            onAddEvent={addEvent}
-            enableSummarization={agentConfig.enableSummarization}
-            enableQuickReplies={agentConfig.enableQuickReplies}
-            selectedEmailIds={selectedEmailIds}
-          />
+
         </div>
 
         <div className="hidden md:flex group flex-shrink-0">
@@ -874,12 +923,6 @@ const App: React.FC = () => {
                 flexShrink: 0,
             }}
         >
-           <ChatAssistant 
-            messages={messages}
-            onSendMessage={handleUserMessage} 
-            isProcessing={isProcessing}
-            suggestedActions={suggestedActions}
-           />
         </div>
         </>
         )}

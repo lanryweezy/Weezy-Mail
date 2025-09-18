@@ -1,5 +1,5 @@
 import { GoogleGenAI, Type } from "@google/genai";
-import { Email, AIActionResponse, ChatMessage, MessageAuthor, MailboxView, AIAction, EmailCategory, AISearchCriteria, AgentPersonality } from '../types';
+import { Email, AIActionResponse, ChatMessage, MessageAuthor, MailboxView, AIAction, EmailCategory, AISearchCriteria, AgentPersonality, DetectedTask } from '../types';
 
 const API_KEY = process.env.API_KEY;
 
@@ -29,7 +29,7 @@ const actionSchema = {
                             sender: { type: Type.STRING, description: 'The sender of an email to search for.' },
                             subject: { type: Type.STRING, description: 'Keywords in the subject of an email to search for.' },
                             keyword: { type: Type.STRING, description: 'A keyword to search for in an email body.' },
-                            emailId: { type: Type.INTEGER, description: 'The unique ID of a specific email to act upon. Required for most actions. If not specified by user, infer from context (e.g., the currently selected email).' },
+                            emailId: { type: Type.STRING, description: 'The unique ID of a specific email to act upon. Required for most actions. If not specified by user, infer from context (e.g., the currently selected email).' },
                             summary_scope: { type: Type.STRING, enum: ['UNREAD', 'ALL', 'IMPORTANT'], description: 'The scope of emails to summarize.' },
                             question: { type: Type.STRING, description: 'A specific question to answer from the body of an email.' },
                             recipient_email: { type: Type.STRING, description: 'The recipient email address.' },
@@ -209,6 +209,88 @@ Example Output: ["Sounds great, I'm available.", "I'm busy tomorrow, can we do n
     }
 };
 
+export const detectTasksInEmail = async (email: Email): Promise<DetectedTask[]> => {
+    const systemInstruction = `You are an AI assistant that detects tasks, events, and deadlines in emails. Analyze the email and extract any actionable items.
+- A 'DEADLINE' involves a specific date by which something must be done (e.g., "review by Friday").
+- An 'EVENT' is a meeting or appointment at a specific time (e.g., "meeting tomorrow at 3pm").
+- A 'REMINDER' is a general task without a strict deadline (e.g., "don't forget to send the file").
+- If a date or time is present, convert it to a full ISO 8601 string.
+- If no tasks are found, return an empty array.
+- Return a JSON object with a "tasks" key, containing an array of detected task objects.`;
+
+    const schema = {
+        type: Type.OBJECT,
+        properties: {
+            tasks: {
+                type: Type.ARRAY,
+                items: {
+                    type: Type.OBJECT,
+                    properties: {
+                        type: { type: Type.STRING, enum: ['REMINDER', 'EVENT', 'DEADLINE'] },
+                        description: { type: Type.STRING },
+                        date: { type: Type.STRING, nullable: true },
+                    },
+                    required: ['type', 'description']
+                }
+            }
+        },
+        required: ['tasks']
+    };
+
+    try {
+        const response = await ai.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: [{ text: `Current Time: ${new Date().toISOString()}\n\nFrom: ${email.sender}\nSubject: ${email.subject}\n\n${email.body}` }],
+            config: {
+                systemInstruction,
+                responseMimeType: "application/json",
+                responseSchema: schema,
+                temperature: 0.1,
+            },
+        });
+        const jsonText = response.text.trim();
+        const result = JSON.parse(jsonText);
+        return result.tasks as DetectedTask[];
+    } catch (error) {
+        console.error("Error detecting tasks:", error);
+        return [];
+    }
+};
+
+export const generateSummary = async (email: { subject: string, body: string }): Promise<string> => {
+    const systemInstruction = `You are an AI assistant that summarizes emails. Create a single, concise sentence that captures the core point of the email. The summary should be very short and easy to read at a glance. Return ONLY a JSON object with a "summary" key.
+
+Example Input: { subject: "Project Update", body: "Hi team, quick update on Project Phoenix. The new designs are in and I've attached them. Please review by EOD Friday. We are on track for the launch next month. Let me know of any blockers." }
+Example Output: { "summary": "Review the new Project Phoenix designs by EOD Friday." }`;
+
+    const schema = {
+        type: Type.OBJECT,
+        properties: {
+            summary: { type: Type.STRING }
+        },
+        required: ['summary']
+    };
+
+    try {
+        const response = await ai.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: [{ text: `Subject: ${email.subject}\n\n${email.body.substring(0, 1000)}` }],
+            config: {
+                systemInstruction,
+                responseMimeType: "application/json",
+                responseSchema: schema,
+                temperature: 0.2,
+            },
+        });
+        const jsonText = response.text.trim();
+        const result = JSON.parse(jsonText);
+        return result.summary;
+    } catch (error) {
+        console.error("Error generating summary:", error);
+        return ""; // Return empty string on error
+    }
+};
+
 export const categorizeEmail = async (email: { sender: string; subject: string; body: string }): Promise<EmailCategory> => {
     const systemInstruction = `You are an email categorization AI. Classify the email into one of three categories: 
 - PRIMARY: Personal or important conversations, direct messages to the user.
@@ -288,5 +370,41 @@ Supported keys are:
         console.error("Error processing search query:", error);
         // Fallback to a simple keyword search on error
         return { keyword: query };
+    }
+};
+
+export const generateSuggestedActions = async (email: Email): Promise<string[]> => {
+    const systemInstruction = `You are an AI assistant that suggests contextual actions for an email. Based on the email's content, suggest 3-5 relevant actions the user could take. The actions should be phrased as commands for another AI agent.
+
+Examples:
+- If the email is a newsletter, suggest "Unsubscribe from this newsletter".
+- If it's a meeting invite, suggest "Accept meeting" or "Decline meeting".
+- If it's a question, suggest "Answer this question".
+- If it contains a link, suggest "Open link in browser".
+
+Return ONLY a JSON array of strings.`;
+
+    const schema = {
+        type: Type.ARRAY,
+        items: { type: Type.STRING }
+    };
+
+    try {
+        const response = await ai.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: [{ text: `From: ${email.sender}\nSubject: ${email.subject}\n\n${email.body.substring(0, 500)}` }],
+            config: {
+                systemInstruction,
+                responseMimeType: "application/json",
+                responseSchema: schema,
+                temperature: 0.7,
+            },
+        });
+        const jsonText = response.text.trim();
+        const actions = JSON.parse(jsonText) as string[];
+        return actions.slice(0, 5);
+    } catch (error) {
+        console.error("Error generating suggested actions:", error);
+        return [];
     }
 };

@@ -3,18 +3,20 @@ import Icon from './Icon';
 import { Theme, AgentConfig, Account, AgentPersonality } from '../types';
 
 
-interface SettingsModalProps {
-  isOpen: boolean;
-  onClose: () => void;
+import { TriageRule } from '../types';
+
+interface SettingsPageProps {
   theme: Theme;
   onSetTheme: (theme: Theme) => void;
   accounts: Account[];
   onSetAccounts: (accounts: Account[]) => void;
   agentConfig: AgentConfig;
   onSetAgentConfig: (config: AgentConfig) => void;
+  activeRules: TriageRule[];
+  onDeleteRule: (ruleId: string) => void;
 }
 
-type SettingsTab = 'Accounts' | 'Appearance' | 'Agent';
+type SettingsTab = 'Accounts' | 'Appearance' | 'Personality' | 'Automation Rules';
 type AccountProvider = 'Gmail' | 'Outlook' | 'Yahoo' | 'IMAP/SMTP';
 type AddAccountStep = 'selection' | 'form' | 'success';
 type SecurityType = 'SSL/TLS' | 'STARTTLS' | 'None';
@@ -42,7 +44,7 @@ const FormSelect = (props: React.SelectHTMLAttributes<HTMLSelectElement> & { lab
 );
 
 
-const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, theme, onSetTheme, accounts, onSetAccounts, agentConfig, onSetAgentConfig }) => {
+const SettingsPage: React.FC<SettingsPageProps> = ({ theme, onSetTheme, accounts, onSetAccounts, agentConfig, onSetAgentConfig, activeRules, onDeleteRule }) => {
   const [activeTab, setActiveTab] = useState<SettingsTab>('Accounts');
   
   // --- Add Account State ---
@@ -74,9 +76,6 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, theme, o
     }
   }, [formEmail, selectedProvider]);
 
-
-  if (!isOpen) return null;
-
   const resetFormState = () => {
     setAddAccountStep('selection');
     setSelectedProvider(null);
@@ -92,11 +91,16 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, theme, o
   }
 
   const handleAddAccount = (provider: AccountProvider) => {
-    setSelectedProvider(provider);
-    if (provider !== 'IMAP/SMTP') {
-        setFormEmail(`your.name@${provider.split('/')[0].toLowerCase()}.com`);
+    if (provider === 'Gmail') {
+      // Redirect to the backend for Google OAuth
+      window.location.href = '/api/auth/google';
+    } else {
+      setSelectedProvider(provider);
+      if (provider !== 'IMAP/SMTP') {
+          setFormEmail(`your.name@${provider.split('/')[0].toLowerCase()}.com`);
+      }
+      setAddAccountStep('form');
     }
-    setAddAccountStep('form');
   };
 
   const handleConnectAccount = (e: React.FormEvent) => {
@@ -270,10 +274,10 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, theme, o
     </div>
   );
 
-  const renderAgentTab = () => (
+  const renderPersonalityTab = () => (
     <div>
-        <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-2">Email Agent</h3>
-        <p className="text-sm text-[var(--text-tertiary)] mb-4">Configure your AI agent's behavior.</p>
+        <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-2">Agent Personality</h3>
+        <p className="text-sm text-[var(--text-tertiary)] mb-4">Configure your AI agent's conversational style.</p>
          <div className="space-y-4">
             <div>
                 <label htmlFor="agent-personality" className="font-medium text-[var(--text-secondary)]">Agent Personality</label>
@@ -310,6 +314,33 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, theme, o
     </div>
   );
   
+  const renderRulesTab = () => (
+    <div>
+        <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-2">Automation Rules</h3>
+        <p className="text-sm text-[var(--text-tertiary)] mb-4">Manage the rules your AI agent uses to automatically triage emails.</p>
+        <div className="space-y-3">
+            {activeRules.length > 0 ? (
+                activeRules.map(rule => (
+                    <div key={rule.id} className="flex items-center justify-between bg-white/5 p-3 rounded-lg">
+                        <div>
+                            <p className="font-medium text-[var(--text-primary)]">
+                                Automatically <span className="font-bold text-[var(--accent-cyan)]">{rule.action.toLowerCase()}</span> emails from <span className="font-bold text-[var(--accent-cyan)]">{rule.sender}</span>
+                            </p>
+                        </div>
+                        <button onClick={() => onDeleteRule(rule.id)} className="text-xs font-semibold text-red-400 hover:text-red-300 transition-colors">
+                            Delete
+                        </button>
+                    </div>
+                ))
+            ) : (
+                <div className="text-center p-8 bg-white/5 rounded-lg">
+                    <p className="text-[var(--text-secondary)]">You have no active automation rules.</p>
+                </div>
+            )}
+        </div>
+    </div>
+  );
+
   const TabButton: React.FC<{label: SettingsTab}> = ({label}) => (
       <button onClick={() => setActiveTab(label)} className={`px-4 py-2 text-sm font-semibold rounded-md transition-colors w-full text-left ${activeTab === label ? 'bg-white/10 text-[var(--text-primary)]' : 'text-[var(--text-secondary)] hover:bg-white/5 hover:text-[var(--text-primary)]'}`}>
           {label}
@@ -317,29 +348,31 @@ const SettingsModal: React.FC<SettingsModalProps> = ({ isOpen, onClose, theme, o
   );
 
   return (
-    <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-40 flex items-center justify-center p-4 animate-slow-fade-in" onClick={onClose}>
-      <div className="bg-[var(--bg-panel-solid)] border border-[var(--border-glow)] rounded-2xl shadow-2xl w-full max-w-4xl flex flex-col max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between p-4 border-b border-[var(--border-glow)] flex-shrink-0">
-          <h2 className="text-xl font-bold text-[var(--text-primary)]">Settings</h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-white text-2xl leading-none transition-colors">&times;</button>
+    <div className="p-4 sm:p-6 h-full flex flex-col animate-slow-fade-in">
+        <div className="flex-shrink-0 pb-4 border-b border-[var(--border-glow)]">
+            <h1 className="text-2xl font-bold text-white tracking-wider flex items-center gap-3">
+                <Icon name="settings" className="w-6 h-6 text-[var(--accent-cyan)]" />
+                <span>Settings</span>
+            </h1>
         </div>
-        <div className="flex-grow flex min-h-0">
+        <div className="flex-grow flex min-h-0 mt-4">
             <div className="w-48 p-4 border-r border-[var(--border-glow)] flex-shrink-0">
                 <nav className="flex flex-col gap-2">
                     <TabButton label="Accounts" />
                     <TabButton label="Appearance" />
-                    <TabButton label="Agent" />
+                    <TabButton label="Personality" />
+                    <TabButton label="Automation Rules" />
                 </nav>
             </div>
             <div className="p-6 flex-grow overflow-y-auto futuristic-scrollbar">
                 {activeTab === 'Accounts' && renderAccountsTab()}
                 {activeTab === 'Appearance' && renderAppearanceTab()}
-                {activeTab === 'Agent' && renderAgentTab()}
+                {activeTab === 'Personality' && renderPersonalityTab()}
+                {activeTab === 'Automation Rules' && renderRulesTab()}
             </div>
         </div>
-      </div>
     </div>
   );
 };
 
-export default SettingsModal;
+export default SettingsPage;

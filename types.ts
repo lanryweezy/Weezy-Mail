@@ -8,8 +8,6 @@ export enum EmailStatus {
   DRAFT = 'DRAFT',
   SNOOZED = 'SNOOZED',
 }
-
-export type MailboxView = 'INBOX' | 'SENT' | 'DRAFTS' | 'IMPORTANT' | 'TRASH' | 'SNOOZED' | 'CALENDAR';
 export type EmailCategory = 'PRIMARY' | 'PROMOTIONS' | 'UPDATES';
 
 export interface CalendarEvent {
@@ -139,5 +137,3 @@ export interface Account {
     email: string;
     provider: string;
 }
-
-

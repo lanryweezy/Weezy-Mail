@@ -4,8 +4,7 @@ import MailboxPanel from './components/MailboxPanel';
 import EmailDetail from './components/EmailDetail';
 import ChatAssistant from './components/ChatAssistant';
 import ComposeModal from './components/ComposeModal';
-import SettingsModal from './components/SettingsModal';
-import Resizer from './components/Resizer';
+import SettingsPage from './components/SettingsPage';
 
 const App: React.FC = () => {
   const [emails, setEmails] = useState<Email[]>(MOCK_EMAILS);
@@ -30,7 +29,6 @@ const App: React.FC = () => {
     { author: MessageAuthor.AI, text: "Hello! I'm your Email Agent. How can I help you today?" }
   ]);
   const [isComposeOpen, setIsComposeOpen] = useState(false);
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [composeInitialState, setComposeInitialState] = useState<{ draftId?: number; recipient?: string; subject?: string; body?: string; attachments?: string[] }>({});
 
   const [activeCategory, setActiveCategory] = useState<EmailCategory>('PRIMARY');
@@ -46,6 +44,25 @@ const App: React.FC = () => {
       enableQuickReplies: true,
       enableSummarization: true
   });
+  const [suggestedActions, setSuggestedActions] = useState<string[]>([]);
+
+  const handleAcceptRule = () => {
+    if (suggestedRule) {
+      const newRule = { ...suggestedRule, id: `rule-${Date.now()}` };
+      setActiveRules(prev => [...prev, newRule]);
+      setSuggestedRule(null);
+      showToast(`Automation rule for ${newRule.sender} created!`);
+    }
+  };
+
+  const handleDeclineRule = () => {
+    setSuggestedRule(null);
+  };
+
+  const deleteRule = (ruleId: string) => {
+    setActiveRules(prevRules => prevRules.filter(rule => rule.id !== ruleId));
+    showToast('Rule deleted.');
+  };
   
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
@@ -56,8 +73,6 @@ const App: React.FC = () => {
       generateSuggestedActions(selectedEmail).then(setSuggestedActions);
     } else {
       setSuggestedActions([]);
-    }
-  }, [selectedEmail]);
 
   }, [panelRefs]);
 
@@ -565,32 +580,9 @@ const App: React.FC = () => {
         onSend={handleSendEmail}
         initialState={composeInitialState}
       />
-      <SettingsModal 
-        isOpen={isSettingsOpen}
-        onClose={() => setIsSettingsOpen(false)}
-        theme={theme}
-        onSetTheme={setTheme}
-        accounts={accounts}
-        onSetAccounts={setAccounts}
-        agentConfig={agentConfig}
-        onSetAgentConfig={setAgentConfig}
-      />
 
       <div ref={containerRef} className="flex-grow w-full h-full flex flex-col md:flex-row p-4 gap-4 md:gap-0">
-        {currentView === 'CALENDAR' ? (
-            <>
-                <div
-                    className="bg-[var(--bg-panel)] border border-[var(--border-glow)] rounded-2xl overflow-hidden flex flex-col backdrop-blur-xl animate-slow-fade-in md:h-auto"
-                    style={{ flexBasis: '25%', minWidth: '240px' }}
-                >
-                    <MailboxPanel
-                        emails={emails}
-                        visibleEmails={visibleEmails}
-                        currentView={currentView}
-                        isViewTransitioning={isViewTransitioning}
-                        onSetView={handleSetView}
-                        onCompose={() => { setComposeInitialState({}); setIsComposeOpen(true); }}
-                        onOpenSettings={() => setIsSettingsOpen(true)}
+
                         onSelectEmail={handleSelectEmail}
                         selectedEmailId={selectedEmailId}
                         highlightedEmailId={highlightedEmailId}
@@ -614,7 +606,6 @@ const App: React.FC = () => {
                     className="bg-[var(--bg-panel)] border border-[var(--border-glow)] rounded-2xl overflow-hidden flex flex-col backdrop-blur-xl animate-slow-fade-in md:h-auto"
                     style={{ flexBasis: '75%' }}
                 >
-                    <CalendarView events={events} />
                 </div>
             </>
         ) : (

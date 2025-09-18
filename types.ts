@@ -9,8 +9,16 @@ export enum EmailStatus {
   SNOOZED = 'SNOOZED',
 }
 
-export type MailboxView = 'INBOX' | 'SENT' | 'DRAFTS' | 'IMPORTANT' | 'TRASH' | 'SNOOZED';
+export type MailboxView = 'INBOX' | 'SENT' | 'DRAFTS' | 'IMPORTANT' | 'TRASH' | 'SNOOZED' | 'CALENDAR';
 export type EmailCategory = 'PRIMARY' | 'PROMOTIONS' | 'UPDATES';
+
+export interface CalendarEvent {
+  id: string;
+  title: string;
+  startTime: string; // ISO 8601 format
+  endTime: string;   // ISO 8601 format
+  description?: string;
+}
 
 export interface Email {
   id: number;
@@ -19,11 +27,21 @@ export interface Email {
   recipient_email?: string;
   subject: string;
   body: string;
+  summary?: string;
   timestamp: string;
   status: EmailStatus;
   category?: EmailCategory;
   snoozedUntil?: string;
   attachments?: string[];
+  detectedTasks?: DetectedTask[];
+}
+
+export type DetectedTaskType = 'REMINDER' | 'EVENT' | 'DEADLINE';
+
+export interface DetectedTask {
+  type: DetectedTaskType;
+  description: string;
+  date?: string; // ISO 8601 format
 }
 
 export enum MessageAuthor {
@@ -104,6 +122,7 @@ export interface AISearchCriteria {
     subject?: string;
     keyword?: string; // for body
     isUnread?: boolean;
+    hasAttachment?: boolean;
 }
 
 // --- App Settings ---
@@ -121,73 +140,4 @@ export interface Account {
     provider: string;
 }
 
-// New types for enhanced agentic features
-export interface Subscription {
-    id: string;
-    name: string;
-    email: string;
-    readCount: number;
-    totalCount: number;
-    lastActivity: string;
-    category: 'newsletter' | 'promotional' | 'updates' | 'social';
-    isActive: boolean;
-    source: string; // e.g., "TechCrunch", "Medium Digest"
-}
 
-export interface SmartAttachment {
-    id: string;
-    name: string;
-    type: 'PDF' | 'DOCX' | 'XLSX' | 'IMG' | 'OTHER';
-    size: number;
-    emailId: number;
-    extractedText?: string;
-    suggestedActions: AttachmentAction[];
-    conversionOptions: string[];
-}
-
-export type AttachmentAction = 
-    | 'convert_to_excel' 
-    | 'summarize_and_send' 
-    | 'extract_text' 
-    | 'categorize'
-    | 'create_task'
-    | 'schedule_followup';
-
-export interface QuickAction {
-    id: string;
-    label: string;
-    icon: string;
-    description: string;
-    action: () => void;
-    category: 'drafting' | 'scheduling' | 'extraction' | 'organization' | 'automation';
-}
-
-export interface InboxSummary {
-    urgentCount: number;
-    actionItemsCount: number;
-    unreadNewsletters: number;
-    filesForConversion: number;
-    overdueReplies: number;
-    scheduledEmails: number;
-}
-
-export interface ConversationThread {
-    id: string;
-    subject: string;
-    participants: string[];
-    emailIds: number[];
-    lastActivity: string;
-    status: 'active' | 'resolved' | 'waiting' | 'escalated';
-    aiSummary?: string;
-    actionItems: string[];
-}
-
-export interface AgenticInsight {
-    type: 'subscription_cleanup' | 'reply_suggestion' | 'file_conversion' | 'schedule_conflict' | 'follow_up_needed';
-    priority: 'low' | 'medium' | 'high';
-    title: string;
-    description: string;
-    actionable: boolean;
-    suggestedAction?: string;
-    relatedEmailIds?: number[];
-}

@@ -1,8 +1,9 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Email, EmailStatus, AIAction } from '../types';
+import { Email, EmailStatus, AIAction, DetectedTask, CalendarEvent } from '../types';
 import Icon from './Icon';
 import { generateQuickReplies } from '../services/geminiService';
+import DetectedTaskPill from './DetectedTaskPill';
 
 
 interface EmailDetailProps {
@@ -10,14 +11,15 @@ interface EmailDetailProps {
   onAction: (action: AIAction, params: any) => void;
   onCompose: (initialState: any) => void;
   onSummarize: (emailId: number) => void;
+  onAddEvent: (event: Omit<CalendarEvent, 'id'>) => void;
   enableSummarization: boolean;
   enableQuickReplies: boolean;
   selectedEmailIds: Set<number>;
 }
 
 const ActionButton: React.FC<{icon: any, label: string, onClick: () => void, className?: string, buttonRef?: React.Ref<HTMLButtonElement>}> = ({ icon, label, onClick, className = '', buttonRef }) => (
-    <button ref={buttonRef} onClick={onClick} className={`group relative flex items-center justify-center w-10 h-10 rounded-full bg-white/5 hover:bg-white/10 transition-colors text-[var(--text-secondary)] hover:text-white ${className}`}>
-        <Icon name={icon} className="w-5 h-5" />
+    <button ref={buttonRef} onClick={onClick} className={`group relative flex items-center justify-center w-10 h-10 rounded-full bg-white/5 hover:bg-[var(--accent-cyan)]/20 transition-all duration-200 text-[var(--text-secondary)] hover:text-[var(--accent-cyan)] active:scale-90 ${className}`}>
+        <Icon name={icon} className="w-5 h-5 transition-transform group-hover:scale-110" />
         <span className="absolute -top-8 left-1/2 -translate-x-1/2 whitespace-nowrap bg-black/80 text-white text-xs px-2 py-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-10">
             {label}
         </span>
@@ -43,7 +45,7 @@ const BulkActionBar: React.FC<{count: number; onAction: (action: AIAction, param
 
 
 const EmailDetail: React.FC<EmailDetailProps> = (props) => {
-  const { email, onAction, onCompose, onSummarize, enableSummarization, enableQuickReplies, selectedEmailIds } = props;
+  const { email, onAction, onCompose, onSummarize, onAddEvent, enableSummarization, enableQuickReplies, selectedEmailIds } = props;
   const [isSnoozeMenuOpen, setIsSnoozeMenuOpen] = useState(false);
   const snoozeMenuRef = useRef<HTMLDivElement>(null);
   const [quickReplies, setQuickReplies] = useState<string[]>([]);
@@ -98,9 +100,14 @@ const EmailDetail: React.FC<EmailDetailProps> = (props) => {
     );
   }
 
-  const handleReply = (replyBody?: string) => {
+  const handleReply = (replyBody?: string, isReplyAll: boolean = false) => {
+    let recipients = [email.sender_email];
+    if (isReplyAll && email.recipient_email) {
+      recipients = [...new Set([...recipients, email.recipient_email])];
+    }
+
     onCompose({
-      recipient: email.sender_email,
+      recipient: recipients.join(', '),
       subject: `Re: ${email.subject}`,
       body: `${replyBody ? replyBody + '\n\n' : '\n\n'}---- On ${new Date(email.timestamp).toLocaleString()}, ${email.sender} wrote: ----\n>${email.body.replace(/\n/g, '\n>')}`
     });
@@ -144,6 +151,24 @@ const EmailDetail: React.FC<EmailDetailProps> = (props) => {
     setIsSnoozeMenuOpen(false);
   }
 
+  const handleTaskAction = (task: DetectedTask) => {
+    if (task.type === 'EVENT' && task.date) {
+        const startTime = new Date(task.date);
+        // Default to a 1-hour event if no end time is detected
+        const endTime = new Date(startTime.getTime() + 60 * 60 * 1000);
+
+        onAddEvent({
+            title: task.description,
+            startTime: startTime.toISOString(),
+            endTime: endTime.toISOString(),
+            description: `From email: "${email?.subject}"`
+        });
+    } else {
+        // Handle other task types like REMINDER or DEADLINE, or show a toast
+        onAction(AIAction.NO_ACTION, { toast: `Reminder for "${task.description}" set!` });
+    }
+  };
+
   const SnoozeMenuItem: React.FC<{label: string, onClick: () => void}> = ({ label, onClick }) => (
     <button onClick={onClick} className="w-full text-left px-4 py-2 text-sm text-[var(--text-secondary)] hover:bg-white/10 hover:text-white transition-colors rounded-md">
         {label}
@@ -161,6 +186,7 @@ const EmailDetail: React.FC<EmailDetailProps> = (props) => {
         </div>
          <div className="flex items-center gap-2 flex-wrap">
               <ActionButton icon="reply" label="Reply" onClick={() => handleReply()} />
+              <ActionButton icon="reply-all" label="Reply All" onClick={() => handleReply(undefined, true)} />
               <ActionButton icon="forward" label="Forward" onClick={handleForward} />
               {enableSummarization && <ActionButton icon="document-text" label="Summarize" onClick={() => onSummarize(email.id)} />}
               {email.status !== EmailStatus.TRASH && <ActionButton icon="trash" label="Delete" onClick={() => onAction(AIAction.DELETE_EMAIL, {emailId: email.id})} />}
@@ -197,6 +223,20 @@ const EmailDetail: React.FC<EmailDetailProps> = (props) => {
         </span>
       </div>
       <div className="flex-grow pt-4 text-[var(--text-secondary)] leading-relaxed overflow-y-auto">
+        {email.detectedTasks && email.detectedTasks.length > 0 && (
+          <div className="mb-6">
+            <h3 className="font-semibold text-white mb-3 flex items-center gap-2">
+              <Icon name="sparkles" className="w-5 h-5 text-cyan-400" />
+              Detected Actions
+            </h3>
+            <div className="flex flex-col gap-2">
+              {email.detectedTasks.map((task, index) => (
+                <DetectedTaskPill key={index} task={task} onAction={handleTaskAction} />
+              ))}
+            </div>
+          </div>
+        )}
+
         <p className="whitespace-pre-wrap text-sm">{email.body}</p>
 
         {email.attachments && email.attachments.length > 0 && (

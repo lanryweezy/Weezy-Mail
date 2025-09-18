@@ -7,9 +7,16 @@ interface ChatAssistantProps {
   messages: ChatMessage[];
   onSendMessage: (message: string) => void;
   isProcessing: boolean;
+  suggestedActions: string[];
 }
 
-const ChatAssistant: React.FC<ChatAssistantProps> = ({ messages, onSendMessage, isProcessing }) => {
+const SuggestedAction: React.FC<{ text: string, onClick: () => void }> = ({ text, onClick }) => (
+    <button onClick={onClick} className="bg-white/5 hover:bg-white/10 p-2 rounded-lg text-sm text-[var(--text-secondary)] hover:text-white transition-all duration-200 border border-transparent hover:border-[var(--accent-cyan)]/50 transform hover:-translate-y-0.5">
+        {text}
+    </button>
+);
+
+const ChatAssistant: React.FC<ChatAssistantProps> = ({ messages, onSendMessage, isProcessing, suggestedActions }) => {
   const [input, setInput] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -21,11 +28,9 @@ const ChatAssistant: React.FC<ChatAssistantProps> = ({ messages, onSendMessage, 
     scrollToBottom();
   }, [messages]);
 
-  const handleSend = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!input.trim() || isProcessing) return;
-
-    onSendMessage(input);
+  const handleSend = (message: string) => {
+    if (!message.trim() || isProcessing) return;
+    onSendMessage(message);
     setInput('');
   };
 
@@ -46,8 +51,17 @@ const ChatAssistant: React.FC<ChatAssistantProps> = ({ messages, onSendMessage, 
           <div ref={messagesEndRef} />
         </div>
       </div>
+      {suggestedActions.length > 0 && (
+        <div className="p-3 border-t border-[var(--border-glow)]">
+            <div className="flex flex-wrap gap-2">
+                {suggestedActions.map((action, index) => (
+                    <SuggestedAction key={index} text={action} onClick={() => handleSend(action)} />
+                ))}
+            </div>
+        </div>
+      )}
       <div className="p-3 border-t border-[var(--border-glow)]">
-        <form onSubmit={handleSend} className="flex items-center gap-2">
+        <form onSubmit={(e) => { e.preventDefault(); handleSend(input); }} className="flex items-center gap-2">
           <input
             type="text"
             value={input}

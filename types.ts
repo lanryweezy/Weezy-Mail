@@ -8,9 +8,15 @@ export enum EmailStatus {
   DRAFT = 'DRAFT',
   SNOOZED = 'SNOOZED',
 }
-
-export type MailboxView = 'INBOX' | 'SENT' | 'DRAFTS' | 'IMPORTANT' | 'TRASH' | 'SNOOZED';
 export type EmailCategory = 'PRIMARY' | 'PROMOTIONS' | 'UPDATES';
+
+export interface CalendarEvent {
+  id: string;
+  title: string;
+  startTime: string; // ISO 8601 format
+  endTime: string;   // ISO 8601 format
+  description?: string;
+}
 
 export interface Email {
   id: number;
@@ -19,11 +25,21 @@ export interface Email {
   recipient_email?: string;
   subject: string;
   body: string;
+  summary?: string;
   timestamp: string;
   status: EmailStatus;
   category?: EmailCategory;
   snoozedUntil?: string;
   attachments?: string[];
+  detectedTasks?: DetectedTask[];
+}
+
+export type DetectedTaskType = 'REMINDER' | 'EVENT' | 'DEADLINE';
+
+export interface DetectedTask {
+  type: DetectedTaskType;
+  description: string;
+  date?: string; // ISO 8601 format
 }
 
 export enum MessageAuthor {
@@ -54,6 +70,16 @@ export enum AIAction {
     OPEN_COMPOSE_MODAL = 'OPEN_COMPOSE_MODAL',
     CHANGE_VIEW = 'CHANGE_VIEW',
     NO_ACTION = 'NO_ACTION',
+    // New agentic actions
+    UNSUBSCRIBE_BULK = 'UNSUBSCRIBE_BULK',
+    CONVERT_ATTACHMENT = 'CONVERT_ATTACHMENT',
+    EXTRACT_INVOICE_DATA = 'EXTRACT_INVOICE_DATA',
+    SCHEDULE_FOLLOWUP = 'SCHEDULE_FOLLOWUP',
+    CLEAN_INBOX = 'CLEAN_INBOX',
+    GENERATE_SUMMARY_DIGEST = 'GENERATE_SUMMARY_DIGEST',
+    AUTO_CATEGORIZE = 'AUTO_CATEGORIZE',
+    DETECT_ACTION_ITEMS = 'DETECT_ACTION_ITEMS',
+    SMART_PRIORITIZE = 'SMART_PRIORITIZE',
 }
 
 export interface AIActionParameter {
@@ -94,6 +120,7 @@ export interface AISearchCriteria {
     subject?: string;
     keyword?: string; // for body
     isUnread?: boolean;
+    hasAttachment?: boolean;
 }
 
 // --- App Settings ---

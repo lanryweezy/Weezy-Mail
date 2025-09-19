@@ -1,29 +1,34 @@
 
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
-import { Email, EmailStatus, AIAction, ChatMessage, MessageAuthor, MailboxView, EmailCategory, AISearchCriteria, Theme, Account, AgentConfig } from './types';
-import { MOCK_EMAILS, createNewMockEmail } from './constants';
 import MailboxPanel from './components/MailboxPanel';
 import EmailDetail from './components/EmailDetail';
 import ChatAssistant from './components/ChatAssistant';
 import ComposeModal from './components/ComposeModal';
-import SettingsModal from './components/SettingsModal';
-import Resizer from './components/Resizer';
-import { processEmailCommand, generateQuickReplies, processSearchQuery } from './services/geminiService';
+import SettingsPage from './components/SettingsPage';
 
 const App: React.FC = () => {
   const [emails, setEmails] = useState<Email[]>(MOCK_EMAILS);
   const [selectedEmailId, setSelectedEmailId] = useState<number | null>(1);
+  const [highlightedEmailId, setHighlightedEmailId] = useState<number | null>(null);
   const [selectedEmailIds, setSelectedEmailIds] = useState<Set<number>>(new Set());
   const [currentView, setCurrentView] = useState<MailboxView>('INBOX');
+  const [isViewTransitioning, setIsViewTransitioning] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [undoAction, setUndoAction] = useState<{ emailIds: number[], previousStatus: EmailStatus } | null>(null);
+  const [actionLog, setActionLog] = useState<ActionLogEntry[]>([]);
+  const [suggestedRule, setSuggestedRule] = useState<Omit<TriageRule, 'id'> | null>(null);
+  const [activeRules, setActiveRules] = useState<TriageRule[]>([]);
   
+  const [events, setEvents] = useState<CalendarEvent[]>([
+      { id: '1', title: 'Project Phoenix Kickoff', startTime: '2025-09-18T14:00:00Z', endTime: '2025-09-18T15:00:00Z' },
+      { id: '2', title: 'Design Review', startTime: '2025-09-19T10:00:00Z', endTime: '2025-09-19T11:30:00Z' },
+  ]);
+
   const [messages, setMessages] = useState<ChatMessage[]>([
     { author: MessageAuthor.AI, text: "Hello! I'm your Email Agent. How can I help you today?" }
   ]);
   const [isComposeOpen, setIsComposeOpen] = useState(false);
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [composeInitialState, setComposeInitialState] = useState<{ draftId?: number; recipient?: string; subject?: string; body?: string; attachments?: string[] }>({});
 
   const [activeCategory, setActiveCategory] = useState<EmailCategory>('PRIMARY');
@@ -39,98 +44,36 @@ const App: React.FC = () => {
       enableQuickReplies: true,
       enableSummarization: true
   });
+  const [suggestedActions, setSuggestedActions] = useState<string[]>([]);
+
+  const handleAcceptRule = () => {
+    if (suggestedRule) {
+      const newRule = { ...suggestedRule, id: `rule-${Date.now()}` };
+      setActiveRules(prev => [...prev, newRule]);
+      setSuggestedRule(null);
+      showToast(`Automation rule for ${newRule.sender} created!`);
+    }
+  };
+
+  const handleDeclineRule = () => {
+    setSuggestedRule(null);
+  };
+
+  const deleteRule = (ruleId: string) => {
+    setActiveRules(prevRules => prevRules.filter(rule => rule.id !== ruleId));
+    showToast('Rule deleted.');
+  };
   
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
   }, [theme]);
-
-
-  // --- Resizable panels state and logic ---
-  const [panelWidths, setPanelWidths] = useState([25, 42, 33]);
-  const isResizing = useRef<number | null>(null);
-  const startPos = useRef(0);
-  const initialWidths = useRef<number[]>([]);
-
-  const containerRef = useRef<HTMLDivElement>(null);
-  const panel1Ref = useRef<HTMLDivElement>(null);
-  const panel2Ref = useRef<HTMLDivElement>(null);
-  const panel3Ref = useRef<HTMLDivElement>(null);
-  const MIN_PANEL_WIDTH_PX = 240;
-
-  const handleMouseMove = useCallback((e: MouseEvent) => {
-    if (isResizing.current === null || !containerRef.current) return;
-
-    const panelRefs = [panel1Ref, panel2Ref, panel3Ref];
-    const leftPanel = panelRefs[isResizing.current]?.current;
-    const rightPanel = panelRefs[isResizing.current + 1]?.current;
-
-    if (!leftPanel || !rightPanel) return;
-
-    const delta = e.clientX - startPos.current;
-    const containerWidth = containerRef.current.offsetWidth;
-    if (containerWidth === 0) return;
-
-    const deltaPercent = (delta / containerWidth) * 100;
-
-    const resizerIndex = isResizing.current;
-    const leftPanelIndex = resizerIndex;
-    const rightPanelIndex = resizerIndex + 1;
-
-    const widths = [...initialWidths.current];
-    const combinedWidth = widths[leftPanelIndex] + widths[rightPanelIndex];
-    const minWidthPercent = (MIN_PANEL_WIDTH_PX / containerWidth) * 100;
-
-    let newLeftWidth = widths[leftPanelIndex] + deltaPercent;
-
-    if (newLeftWidth < minWidthPercent) {
-        newLeftWidth = minWidthPercent;
-    }
-
-    if (newLeftWidth > combinedWidth - minWidthPercent) {
-        newLeftWidth = combinedWidth - minWidthPercent;
-    }
-
-    const newRightWidth = combinedWidth - newLeftWidth;
-
-    leftPanel.style.flexBasis = `${newLeftWidth}%`;
-    rightPanel.style.flexBasis = `${newRightWidth}%`;
-  }, []);
-
-  const handleMouseUp = useCallback(() => {
-    if (isResizing.current === null) return;
-
-    const panelElements = [panel1Ref.current, panel2Ref.current, panel3Ref.current];
-    const newWidths = panelElements.map(el => {
-        if (!el) return 0;
-        return parseFloat(el.style.flexBasis);
-    });
-
-    if (newWidths.every(w => !isNaN(w) && w > 0)) {
-        setPanelWidths(newWidths);
-    }
-
-    isResizing.current = null;
-    window.removeEventListener('mousemove', handleMouseMove);
-    window.removeEventListener('mouseup', handleMouseUp);
-  }, [handleMouseMove]);
-
-  const handleMouseDown = useCallback((index: number, e: React.MouseEvent) => {
-    isResizing.current = index;
-    startPos.current = e.clientX;
-    initialWidths.current = [...panelWidths];
-    e.preventDefault();
-
-    window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('mouseup', handleMouseUp);
-  }, [panelWidths, handleMouseMove, handleMouseUp]);
-
-
   useEffect(() => {
-    return () => {
-        window.removeEventListener('mousemove', handleMouseMove);
-        window.removeEventListener('mouseup', handleMouseUp);
-    };
-  }, [handleMouseMove, handleMouseUp]);
+    if (selectedEmail) {
+      generateSuggestedActions(selectedEmail).then(setSuggestedActions);
+    } else {
+      setSuggestedActions([]);
+
+  }, [panelRefs]);
 
 
   const showToast = (message: string, duration: number = 3000) => {
@@ -183,6 +126,30 @@ const App: React.FC = () => {
 
   const selectedEmail = useMemo(() => emails.find(e => e.id === selectedEmailId) || null, [emails, selectedEmailId]);
 
+  const addEvent = (event: Omit<CalendarEvent, 'id'>) => {
+    const newEvent: CalendarEvent = {
+        ...event,
+        id: `evt-${Date.now()}`,
+    };
+    setEvents(prevEvents => [...prevEvents, newEvent]);
+    showToast(`Event "${newEvent.title}" added to calendar!`);
+  };
+
+  const handleSetView = (view: MailboxView) => {
+    if (view === currentView) return;
+
+    setIsViewTransitioning(true);
+    setTimeout(() => {
+      setCurrentView(view);
+      setAiSearchCriteria(null);
+      setSearchQuery('');
+      setSelectedEmailId(null);
+      setHighlightedEmailId(null);
+      setSelectedEmailIds(new Set());
+      setIsViewTransitioning(false);
+    }, 200); // Duration should match the fade-out animation
+  };
+
   const handleSelectEmail = (email: Email) => {
     if (email.status === EmailStatus.DRAFT) {
         executeAction({ action: AIAction.EDIT_DRAFT, parameters: { emailId: email.id }});
@@ -213,7 +180,9 @@ const App: React.FC = () => {
     const singleTargetId = targetIds[0];
 
     // --- Show Toast Messages ---
-    if (![AIAction.NO_ACTION, AIAction.SUMMARIZE_EMAILS, AIAction.FIND_EMAILS, AIAction.CHANGE_VIEW, AIAction.ANSWER_QUESTION_FROM_EMAIL].includes(action)) {
+    if (params?.toast) {
+        showToast(params.toast);
+    } else if (![AIAction.NO_ACTION, AIAction.SUMMARIZE_EMAILS, AIAction.FIND_EMAILS, AIAction.CHANGE_VIEW, AIAction.ANSWER_QUESTION_FROM_EMAIL].includes(action)) {
         if (isBulkAction) {
             showToast(`${targetIds.length} items updated.`);
         } else {
@@ -347,6 +316,19 @@ const App: React.FC = () => {
     if (isBulkAction) {
         setSelectedEmailId(null);
         setSelectedEmailIds(new Set());
+    } else if (action === AIAction.DELETE_EMAIL || action === AIAction.ARCHIVE_EMAIL) {
+        // Log the action for triage learning
+        const email = emails.find(e => e.id === singleTargetId);
+        if (email) {
+            const triageAction: TriageAction = action === AIAction.DELETE_EMAIL ? 'DELETE' : 'ARCHIVE';
+            const logEntry: ActionLogEntry = {
+                action: triageAction,
+                emailId: email.id,
+                sender: email.sender,
+                timestamp: Date.now(),
+            };
+            setActionLog(prevLog => [...prevLog, logEntry]);
+        }
     }
   }
 
@@ -378,22 +360,31 @@ const App: React.FC = () => {
     }
   }, [emails, messages, selectedEmailId, currentView, agentConfig.personality]);
 
-  const handleAiSearch = useCallback(async (query: string) => {
-    if (!query) {
+  const handleAiSearch = useCallback(async (queryOrCriteria: string | AISearchCriteria) => {
+    if (!queryOrCriteria) {
       setAiSearchCriteria(null);
       setSearchQuery('');
       return;
     }
+
     setIsSearching(true);
-    setSearchQuery(query);
+    // For structured search, we can create a descriptive query string for display
+    const displayQuery = typeof queryOrCriteria === 'string' ? queryOrCriteria : 'Advanced Search';
+    setSearchQuery(displayQuery);
+
     try {
-        const criteria = await processSearchQuery(query);
+        let criteria: AISearchCriteria;
+        if (typeof queryOrCriteria === 'string') {
+            criteria = await processSearchQuery(queryOrCriteria);
+        } else {
+            criteria = queryOrCriteria;
+        }
         setAiSearchCriteria(criteria);
         setSelectedEmailIds(new Set());
     } catch (error) {
         console.error("AI Search Error:", error);
         showToast("AI search failed. Using basic search.");
-        setAiSearchCriteria(null); // Fallback to basic search
+        setAiSearchCriteria(null);
     } finally {
         setIsSearching(false);
     }
@@ -451,7 +442,7 @@ const App: React.FC = () => {
     // 3. Filter by AI Search Criteria
     if (aiSearchCriteria) {
         return filteredEmails.filter(e => {
-            const { sender, subject, keyword, isUnread } = aiSearchCriteria;
+            const { sender, subject, keyword, isUnread, hasAttachment } = aiSearchCriteria;
             const lowercasedSender = sender?.toLowerCase();
             const lowercasedSubject = subject?.toLowerCase();
             const lowercasedKeyword = keyword?.toLowerCase();
@@ -459,7 +450,8 @@ const App: React.FC = () => {
             return (!lowercasedSender || e.sender.toLowerCase().includes(lowercasedSender)) &&
                    (!lowercasedSubject || e.subject.toLowerCase().includes(lowercasedSubject)) &&
                    (!lowercasedKeyword || e.body.toLowerCase().includes(lowercasedKeyword)) &&
-                   (isUnread === undefined || (isUnread && e.status === EmailStatus.UNREAD));
+                   (isUnread === undefined || (isUnread && e.status === EmailStatus.UNREAD)) &&
+                   (hasAttachment === undefined || (hasAttachment && e.attachments && e.attachments.length > 0));
         });
     }
 
@@ -487,9 +479,92 @@ const App: React.FC = () => {
     }
   };
 
+  // --- Agentic Feature Handlers ---
+  const handleUnsubscribe = (subscriptionIds: string[]) => {
+    setSubscriptions(prev => prev.filter(sub => !subscriptionIds.includes(sub.id)));
+    setToastMessage(`Unsubscribed from ${subscriptionIds.length} newsletter(s)`);
+    setTimeout(() => setToastMessage(null), 3000);
+  };
+
+  const handleToggleDigestMode = (subscriptionId: string) => {
+    setSubscriptions(prev => prev.map(sub => 
+      sub.id === subscriptionId ? { ...sub, isActive: !sub.isActive } : sub
+    ));
+  };
+
+  const handleConvertFile = (attachmentId: string, format: string) => {
+    console.log(`Converting ${attachmentId} to ${format}`);
+    setToastMessage(`Converting file to ${format.toUpperCase()}`);
+    setTimeout(() => setToastMessage(null), 3000);
+  };
+
+  const handleExtractText = (attachmentId: string) => {
+    const attachment = smartAttachments.find(a => a.id === attachmentId);
+    if (attachment) {
+      console.log(`Extracting text from ${attachment.name}`);
+      setToastMessage(`Extracting text from ${attachment.name}`);
+      setTimeout(() => setToastMessage(null), 3000);
+    }
+  };
+
+  const handleSummarizeAndSend = (attachmentId: string, recipient: string) => {
+    const attachment = smartAttachments.find(a => a.id === attachmentId);
+    if (attachment) {
+      console.log(`Summarizing ${attachment.name} and sending to ${recipient}`);
+      setToastMessage(`Summarizing and sending ${attachment.name}`);
+      setTimeout(() => setToastMessage(null), 3000);
+    }
+  };
+
+  const handleCreateTask = (attachmentId: string) => {
+    const attachment = smartAttachments.find(a => a.id === attachmentId);
+    if (attachment) {
+      console.log(`Creating task for ${attachment.name}`);
+      setToastMessage(`Task created for ${attachment.name}`);
+      setTimeout(() => setToastMessage(null), 3000);
+    }
+  };
+
+  const handleExecuteQuickAction = (actionId: string) => {
+    const action = quickActions.find(a => a.id === actionId);
+    if (action) {
+      action.action();
+      setToastMessage(`Executed: ${action.label}`);
+      setTimeout(() => setToastMessage(null), 3000);
+    }
+  };
+
+  const handleDismissInsight = (insightId: string) => {
+    setAgenticInsights(prev => prev.filter(insight => insight.title !== insightId));
+  };
+
+  const handleSendChatMessage = (message: string) => {
+    const newMessage: ChatMessage = {
+      author: MessageAuthor.USER,
+      text: message
+    };
+    setMessages(prev => [...prev, newMessage]);
+    
+    // Simulate AI response
+    setTimeout(() => {
+      const aiResponse: ChatMessage = {
+        author: MessageAuthor.AI,
+        text: `I'll help you with: "${message}". Let me process that for you.`
+      };
+      setMessages(prev => [...prev, aiResponse]);
+    }, 1000);
+  };
+
 
   return (
     <div className="h-screen w-screen text-[var(--text-primary)] font-sans overflow-hidden flex flex-col">
+      {suggestedRule && (
+        <RuleSuggestionToast
+            rule={suggestedRule}
+            onAccept={handleAcceptRule}
+            onDecline={handleDeclineRule}
+        />
+      )}
       {toastMessage && (
         <div className="absolute top-5 right-5 bg-[var(--bg-panel-solid)] border border-[var(--border-glow)] text-white py-2 px-5 rounded-lg shadow-2xl z-50 flex items-center gap-4 backdrop-blur-xl animate-slow-fade-in">
           <span>{toastMessage}</span>
@@ -504,24 +579,42 @@ const App: React.FC = () => {
         onSend={handleSendEmail}
         initialState={composeInitialState}
       />
-      <SettingsModal
-        isOpen={isSettingsOpen}
-        onClose={() => setIsSettingsOpen(false)}
-        theme={theme}
-        onSetTheme={setTheme}
-        accounts={accounts}
-        onSetAccounts={setAccounts}
-        agentConfig={agentConfig}
-        onSetAgentConfig={setAgentConfig}
-      />
-
       <div ref={containerRef} className="flex-grow w-full h-full flex flex-col md:flex-row p-4 gap-4 md:gap-0">
+
+                        onSelectEmail={handleSelectEmail}
+                        selectedEmailId={selectedEmailId}
+                        highlightedEmailId={highlightedEmailId}
+                        onAiSearch={handleAiSearch}
+                        isSearching={isSearching}
+                        aiCriteria={aiSearchCriteria}
+                        searchQuery={searchQuery}
+                        onClearSearch={() => { setAiSearchCriteria(null); setSearchQuery(''); }}
+                        activeCategory={activeCategory}
+                        onSetCategory={setActiveCategory}
+                        selectedEmailIds={selectedEmailIds}
+                        onToggleSelectId={handleToggleSelectId}
+                        onToggleSelectAll={handleToggleSelectAll}
+                        onAction={(action, params) => executeAction({ action, parameters: params })}
+                    />
+                </div>
+                <div className="hidden md:flex group flex-shrink-0">
+                    <Resizer onMouseDown={(e) => handleMouseDown(0, e)} />
+                </div>
+                <div
+                    className="bg-[var(--bg-panel)] border border-[var(--border-glow)] rounded-2xl overflow-hidden flex flex-col backdrop-blur-xl animate-slow-fade-in md:h-auto"
+                    style={{ flexBasis: '75%' }}
+                >
+                </div>
+            </>
+        ) : (
+        <>
         <div
-            ref={panel1Ref}
+            ref={panelRefs[0]}
             className="bg-[var(--bg-panel)] border border-[var(--border-glow)] rounded-2xl overflow-hidden flex flex-col backdrop-blur-xl animate-slow-fade-in md:h-auto" 
             style={{
                 animationDelay: '100ms',
                 flexBasis: `${panelWidths[0]}%`,
+                transition: 'flex-basis 0.3s ease-in-out',
                 minWidth: `${MIN_PANEL_WIDTH_PX}px`,
                 flexShrink: 0,
             }}
@@ -530,17 +623,13 @@ const App: React.FC = () => {
             emails={emails}
             visibleEmails={visibleEmails}
             currentView={currentView}
-            onSetView={(view) => {
-                setCurrentView(view);
-                setAiSearchCriteria(null);
-                setSearchQuery('');
-                setSelectedEmailId(null);
-                setSelectedEmailIds(new Set());
-            }}
+            isViewTransitioning={isViewTransitioning}
+            onSetView={handleSetView}
             onCompose={() => { setComposeInitialState({}); setIsComposeOpen(true); }}
             onOpenSettings={() => setIsSettingsOpen(true)}
             onSelectEmail={handleSelectEmail}
             selectedEmailId={selectedEmailId}
+            highlightedEmailId={highlightedEmailId}
             onAiSearch={handleAiSearch}
             isSearching={isSearching}
             aiCriteria={aiSearchCriteria}
@@ -551,6 +640,7 @@ const App: React.FC = () => {
             selectedEmailIds={selectedEmailIds}
             onToggleSelectId={handleToggleSelectId}
             onToggleSelectAll={handleToggleSelectAll}
+            onAction={(action, params) => executeAction({ action, parameters: params })}
           />
         </div>
 
@@ -559,24 +649,16 @@ const App: React.FC = () => {
         </div>
 
         <div
-            ref={panel2Ref}
+            ref={panelRefs[1]}
             className="bg-[var(--bg-panel)] border border-[var(--border-glow)] rounded-2xl overflow-hidden flex flex-col backdrop-blur-xl animate-slow-fade-in md:h-auto" 
             style={{
                 animationDelay: '200ms',
                 flexBasis: `${panelWidths[1]}%`,
+                transition: 'flex-basis 0.3s ease-in-out',
                 minWidth: `${MIN_PANEL_WIDTH_PX}px`,
                 flexShrink: 0,
             }}
         >
-          <EmailDetail
-            email={selectedEmail}
-            onAction={(action, params) => executeAction({action, parameters: params})}
-            onCompose={(initialState) => { setComposeInitialState(initialState); setIsComposeOpen(true); }}
-            onSummarize={handleSummarize}
-            enableSummarization={agentConfig.enableSummarization}
-            enableQuickReplies={agentConfig.enableQuickReplies}
-            selectedEmailIds={selectedEmailIds}
-          />
         </div>
 
         <div className="hidden md:flex group flex-shrink-0">
@@ -584,21 +666,19 @@ const App: React.FC = () => {
         </div>
 
         <div
-            ref={panel3Ref}
+            ref={panelRefs[2]}
             className="bg-[var(--bg-panel)] border border-[var(--border-glow)] rounded-2xl flex flex-col backdrop-blur-xl animate-slow-fade-in md:h-auto"
             style={{
                 animationDelay: '300ms',
                 flexBasis: `${panelWidths[2]}%`,
+                transition: 'flex-basis 0.3s ease-in-out',
                 minWidth: `${MIN_PANEL_WIDTH_PX}px`,
                 flexShrink: 0,
             }}
         >
-           <ChatAssistant 
-            messages={messages}
-            onSendMessage={handleUserMessage} 
-            isProcessing={isProcessing}
-           />
         </div>
+        </>
+        )}
       </div>
     </div>
   );

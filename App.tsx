@@ -67,7 +67,6 @@ const App: React.FC = () => {
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
   }, [theme]);
-
   useEffect(() => {
     if (selectedEmail) {
       generateSuggestedActions(selectedEmail).then(setSuggestedActions);
@@ -168,16 +167,16 @@ const App: React.FC = () => {
   
   const executeAction = (actionRequest: { action: AIAction, parameters?: any }) => {
     const { action, parameters: params } = actionRequest;
-    
+
     // Determine target IDs for bulk or single actions
     const isBulkAction = selectedEmailIds.size > 0 && !params?.emailId;
     const targetIds = isBulkAction ? Array.from(selectedEmailIds) : [params?.emailId ?? selectedEmailId];
-    
+
     if (targetIds.length === 0 || (targetIds.length === 1 && targetIds[0] === null)) {
       // No target, do nothing. Maybe show a toast in future.
       return;
     }
-    
+
     const singleTargetId = targetIds[0];
 
     // --- Show Toast Messages ---
@@ -190,10 +189,10 @@ const App: React.FC = () => {
             showToast(`Action: ${action.replace(/_/g, ' ')}`);
         }
     }
-      
+
     setEmails(prevEmails => {
       let newEmails = [...prevEmails];
-      
+
       switch (action) {
         case AIAction.ARCHIVE_EMAIL:
         case AIAction.DELETE_EMAIL:
@@ -213,9 +212,9 @@ const App: React.FC = () => {
                 [AIAction.MARK_AS_IMPORTANT]: EmailStatus.IMPORTANT,
             };
             const newStatus = statusMap[action]!;
-            
+
             newEmails = newEmails.map(e => targetIds.includes(e.id) ? { ...e, status: newStatus, snoozedUntil: action === AIAction.SNOOZE_EMAIL ? params.snooze_until : e.snoozedUntil } : e);
-            
+
             if([AIAction.ARCHIVE_EMAIL, AIAction.DELETE_EMAIL, AIAction.SNOOZE_EMAIL].includes(action)) {
                  // For simplicity, undo only tracks the status of the first item in a bulk action
                 setUndoAction({ emailIds: targetIds, previousStatus: originalEmail.status });
@@ -239,7 +238,7 @@ const App: React.FC = () => {
                   category: 'PRIMARY',
               };
               newEmails = [newEmail, ...newEmails];
-              
+
               if(params.draftId) {
                 newEmails = newEmails.filter(e => e.id !== params.draftId);
               }
@@ -342,10 +341,10 @@ const App: React.FC = () => {
     try {
       const context = { emails, selectedEmailId, currentView };
       const actionResponse = await processEmailCommand(currentHistory, context, agentConfig.personality);
-      
+
       const aiMessage: ChatMessage = { author: MessageAuthor.AI, text: actionResponse.response_message };
       setMessages(prev => [...prev, aiMessage]);
-      
+
       for (const actionRequest of actionResponse.actions) {
         executeAction(actionRequest);
       }
@@ -434,7 +433,7 @@ const App: React.FC = () => {
         default:
             filteredEmails = [];
     }
-    
+
     // 2. Filter by Category if in Inbox
     if (currentView === 'INBOX' && !aiSearchCriteria) {
         filteredEmails = filteredEmails.filter(e => e.category === activeCategory);
@@ -580,7 +579,6 @@ const App: React.FC = () => {
         onSend={handleSendEmail}
         initialState={composeInitialState}
       />
-
       <div ref={containerRef} className="flex-grow w-full h-full flex flex-col md:flex-row p-4 gap-4 md:gap-0">
 
                         onSelectEmail={handleSelectEmail}

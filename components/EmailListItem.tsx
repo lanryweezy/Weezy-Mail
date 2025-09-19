@@ -49,14 +49,6 @@ const EmailListItem: React.FC<EmailListItemProps> = ({ email, isSelected, isHigh
   `;
 
   return (
-    <li onClick={onSelect} className={itemClasses}>
-      <div className="flex-shrink-0 pt-1">
-        <input
-          type="checkbox"
-          checked={isChecked}
-          onClick={handleCheckboxClick}
-          onChange={() => {}}
-          className="w-4 h-4 rounded bg-white/10 border-slate-500 text-[var(--accent-cyan)] focus:ring-0 focus:ring-offset-0 cursor-pointer"
         />
       </div>
       <div className="flex-1 min-w-0">
